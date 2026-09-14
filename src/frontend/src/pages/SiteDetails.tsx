@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api } from '../api/mock';
+import { api } from '../api/client';
 import type { Site, Deviation } from '../api/types';
 import { DataTable, RiskBadge, SeverityBadge, AIBanner, DetailDrawer, EvidencePanel } from '../components';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';

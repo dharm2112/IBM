@@ -57,6 +57,9 @@ let auditLogs: AuditLog[] = [
   { audit_id: 'AL-003', timestamp: '2023-02-06T10:00:00Z', actor: 'watsonx.ai', action: 'Generated CAPA Draft', entity_type: 'CAPA', entity_id: 'CAPA-001', details: 'AI generated draft CAPA for DEV-002' },
 ];
 
+export const setMockSites = (newSites: Site[]) => { sites = newSites; };
+export const setMockDeviations = (newDevs: Deviation[]) => { deviations = newDevs; };
+
 
 // ==========================================
 // UTILS
@@ -79,7 +82,7 @@ const createAuditLog = (action: string, entity_type: string, entity_id: string, 
 // API CLIENT FUNCTIONS
 // ==========================================
 
-export const api = {
+export const mockApi = {
   // GET /api/health
   async getHealth() {
     await delay(200);

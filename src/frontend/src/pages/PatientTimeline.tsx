@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../api/mock';
+import { api } from '../api/client';
 import type { Patient, Visit, Deviation } from '../api/types';
 import { StatCard, Timeline, EvidencePanel, SeverityBadge } from '../components';
 import type { TimelineItem } from '../components/Timeline';
@@ -130,7 +130,7 @@ export const PatientTimeline = () => {
                       selectedVisit.status === 'Completed' ? 'bg-green-50 text-risk-low border-risk-low/20' : 
                       'bg-slate-50 text-slate-500 border-slate-200'
                     }`}>
-                      {selectedDeviation ? 'Deviation' : selectedVisit.status}
+                      {selectedVisitDeviation ? 'Deviation' : selectedVisit.status}
                     </span>
                   </div>
                 </div>

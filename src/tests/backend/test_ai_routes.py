@@ -20,7 +20,7 @@ Run:
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -363,6 +363,94 @@ class TestExtractProtocolErrors:
         assert "api_key" not in response_text
         assert "WATSONX_APIKEY" not in response_text
         assert "project_id" not in response_text
+
+
+
+# ===========================================================================
+# 4.5. POST /ai/extract-protocol-pdf
+# ===========================================================================
+
+
+class TestExtractProtocolPdf:
+    def test_missing_file_returns_422(self, client_with_mock_svc):
+        client, _ = client_with_mock_svc
+        response = client.post("/ai/extract-protocol-pdf")
+        assert response.status_code == 422
+
+    def test_invalid_content_type_returns_400(self, client_with_mock_svc):
+        client, _ = client_with_mock_svc
+        files = {"file": ("test.txt", b"some text", "text/plain")}
+        response = client.post("/ai/extract-protocol-pdf", files=files)
+        assert response.status_code == 400
+        assert "must be a PDF" in response.json()["detail"]
+
+    @patch("src.backend.routers.ai_routes.pypdf.PdfReader")
+    def test_empty_pdf_text_returns_400(self, mock_reader, client_with_mock_svc):
+        client, _ = client_with_mock_svc
+        
+        # Mock PDF with no text
+        mock_pdf = MagicMock()
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "   \n  "
+        mock_pdf.pages = [mock_page]
+        mock_reader.return_value = mock_pdf
+
+        files = {"file": ("test.pdf", b"%PDF-dummy", "application/pdf")}
+        response = client.post("/ai/extract-protocol-pdf", files=files)
+        assert response.status_code == 400
+        assert "No extractable text" in response.json()["detail"]
+
+    @patch("src.backend.routers.ai_routes.pypdf.PdfReader")
+    def test_pdf_parse_error_returns_400(self, mock_reader, client_with_mock_svc):
+        client, _ = client_with_mock_svc
+        
+        mock_reader.side_effect = Exception("Corrupt PDF file")
+
+        files = {"file": ("test.pdf", b"garbage bytes", "application/pdf")}
+        response = client.post("/ai/extract-protocol-pdf", files=files)
+        assert response.status_code == 400
+        assert "Failed to parse PDF" in response.json()["detail"]
+
+    @patch("src.backend.routers.ai_routes.pypdf.PdfReader")
+    def test_happy_path_extracts_and_delegates(self, mock_reader, client_with_mock_svc):
+        client, svc = client_with_mock_svc
+        
+        mock_pdf = MagicMock()
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Mock Protocol Text from PDF"
+        mock_pdf.pages = [mock_page]
+        mock_reader.return_value = mock_pdf
+
+        # Mock the protocol extractor result
+        mock_result = MagicMock()
+        mock_result.rule_count = 1
+        mock_result.warnings = []
+        mock_result.to_dict.return_value = {
+            "rules": [
+                {
+                    "rule_id": "MED-001",
+                    "category": "medication",
+                    "description": "foo",
+                    "severity": "major",
+                }
+            ]
+        }
+
+        with patch("src.backend.routers.ai_routes.ProtocolExtractor") as MockExtractor:
+            mock_extractor_instance = MockExtractor.return_value
+            mock_extractor_instance.extract.return_value = mock_result
+
+            files = {"file": ("test.pdf", b"%PDF-1.4...", "application/pdf")}
+            response = client.post("/ai/extract-protocol-pdf", files=files)
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["rule_count"] == 1
+            # Verify status is forced to "pending"
+            assert data["rules"][0]["status"] == "pending"
+            
+            # Verify the extracted text was passed to the extractor
+            mock_extractor_instance.extract.assert_called_once_with("Mock Protocol Text from PDF")
 
 
 # ===========================================================================

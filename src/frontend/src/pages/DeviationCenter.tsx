@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/mock';
+import { api } from '../api/client';
 import type { Deviation } from '../api/types';
 import { DataTable, SeverityBadge, StatCard, DetailDrawer, EvidencePanel } from '../components';
-import { Search, Filter, Calendar } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export const DeviationCenter = () => {
   const navigate = useNavigate();
