@@ -50,7 +50,8 @@ def evaluate_medication_rules(
             # end_date IS NULL / end_date >= enrollment_date.
             enrollment_date = (getattr(patient, "enrollment_date", "")
                                or patient.get("enrollment_date", ""))
-            end_date = getattr(med, "end_date", None) or med.get("end_date", None)
+            end_date = med.get("end_date", None) if isinstance(med, dict) else getattr(med, "end_date", None)
+
             overlaps_study = (
                 not start_date  # no date → conservative: assume overlap
                 or not enrollment_date
