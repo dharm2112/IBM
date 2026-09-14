@@ -44,6 +44,7 @@ class DatasetExporter:
             "lab_results.json": [l.to_dict() for l in bundle.lab_results],
             "medications.json": [m.to_dict() for m in bundle.medications],
             "consent_records.json": [c.to_dict() for c in bundle.consent_records],
+            "audit_logs.json": [a.to_dict() for a in bundle.audit_logs],
             "deviations.json": [dev.to_dict() for dev in bundle.deviations],
         }
 
@@ -64,6 +65,7 @@ class DatasetExporter:
             "lab_results": [l.to_dict() for l in bundle.lab_results],
             "medications": [m.to_dict() for m in bundle.medications],
             "consent_records": [c.to_dict() for c in bundle.consent_records],
+            "audit_logs": [a.to_dict() for a in bundle.audit_logs],
             "deviations": [dev.to_dict() for dev in bundle.deviations],
         }
         bundle_path = self.output_dir / "trialguard_dataset.json"
@@ -85,6 +87,7 @@ class DatasetExporter:
             "lab_results.csv": [l.to_dict() for l in bundle.lab_results],
             "medications.csv": [m.to_dict() for m in bundle.medications],
             "consent_records.csv": [c.to_dict() for c in bundle.consent_records],
+            "audit_logs.csv": [a.to_dict() for a in bundle.audit_logs],
             "deviations.csv": [dev.to_dict() for dev in bundle.deviations],
         }
 
@@ -181,6 +184,16 @@ class DatasetExporter:
                 f"VALUES ({sql_val(m.med_id)}, {sql_val(m.patient_id)}, {sql_val(m.drug_name)}, {sql_val(m.drug_class)}, {sql_val(m.start_date)}, {sql_val(m.end_date)}, "
                 f"{sql_val(m.dose)}, {sql_val(m.indication)}, {sql_val(m.reported_by)}, {sql_val(m.created_at)}) "
                 f"ON CONFLICT (med_id) DO NOTHING;"
+            )
+
+        # Audit Logs
+        lines.append("\n-- Audit Logs")
+        for a in bundle.audit_logs:
+            lines.append(
+                f"INSERT INTO audit_logs (log_id, entity_type, entity_id, action, performed_by, performed_at, patient_id, site_id, ip_address, session_id, created_at) "
+                f"VALUES ({sql_val(a.log_id)}, {sql_val(a.entity_type)}, {sql_val(a.entity_id)}, {sql_val(a.action)}, {sql_val(a.performed_by)}, {sql_val(a.performed_at)}, "
+                f"{sql_val(a.patient_id)}, {sql_val(a.site_id)}, {sql_val(a.ip_address)}, {sql_val(a.session_id)}, {sql_val(a.created_at)}) "
+                f"ON CONFLICT (log_id) DO NOTHING;"
             )
 
         # Deviations

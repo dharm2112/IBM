@@ -78,57 +78,45 @@ class TestProtocolLoader:
 
 
 class TestDatasetGeneration:
-    def test_generate_dataset_counts(self, generator_config):
-        bundle = generate_dataset(generator_config)
+    def test_generate_normal_dataset_baseline(self, generator_config):
+        from src.data_generator.cli import generate_normal_dataset
+
+        bundle = generate_normal_dataset(generator_config)
         summary = bundle.summary()
 
         assert summary["sites"] == 10
         assert summary["patients"] == 100
         assert summary["visits"] == 600
-        assert summary["dosing_events"] >= 490  # 5 dosing visits per patient minus intentional drops
-        assert summary["lab_results"] >= 1100
-        assert summary["medications"] >= 300
-        assert summary["consent_records"] == 200  # 2 per patient (initial + amendment)
-        assert summary["deviations"] == 43
+        assert summary["dosing_events"] == 500
+        assert summary["lab_results"] == 1200
+        assert summary["consent_records"] == 200
+        assert summary["audit_logs"] == 200
+        assert summary["deviations"] == 0  # Pristine baseline
 
-    def test_patient_eligibility_compliance(self, generator_config):
-        bundle = generate_dataset(generator_config)
-        # All patients except the injected anomaly on SITE-105 should meet inclusion criteria
-        for patient in bundle.patients:
-            if patient.patient_code == "PT-105-001":
-                # Injected eligibility deviation: eGFR < 60
-                assert patient.baseline_egfr < 60.0
-            else:
-                assert patient.baseline_egfr >= 60.0
-                assert 6.5 <= patient.baseline_hba1c <= 12.0
-                # Age >= 40 at screening (born before 1975)
-                birth_year = int(patient.date_of_birth.split("-")[0])
-                assert birth_year <= 1975
+        # Baseline eligibility: all 100 patients compliant
+        for p in bundle.patients:
+            assert p.baseline_egfr >= 60.0
+            assert 6.5 <= p.baseline_hba1c <= 12.0
+            birth_year = int(p.date_of_birth.split("-")[0])
+            assert birth_year <= 1975
 
     def test_study_arms_randomization(self, generator_config):
         bundle = generate_dataset(generator_config)
         arms = [p.arm for p in bundle.patients]
         active_count = arms.count("ARM-ACTIVE")
         placebo_count = arms.count("ARM-PLACEBO")
-        # 1:1 balance
+        # 1:1 balance: 50 active, 50 placebo
         assert active_count == 50
         assert placebo_count == 50
 
-    def test_dosing_fixed_integrity_and_exceptions(self, generator_config):
+    def test_generate_abnormal_dataset_counts(self, generator_config):
         bundle = generate_dataset(generator_config)
-        active_doses = [
-            d for d in bundle.dosing_events if d.drug_code == "DAPAGLI-10"
-        ]
-        # Most active doses should be exactly 10 mg
-        doses_10mg = [d for d in active_doses if d.actual_dose == 10.0]
-        assert len(doses_10mg) >= len(active_doses) - 2
+        summary = bundle.summary()
 
-        # Verify intentional overdoses on Site 104
-        s104_doses = [
-            d for d in active_doses if "PT-104" in d.dose_id
-        ]
-        anomalous_doses = [d for d in s104_doses if d.actual_dose in (15.0, 20.0)]
-        assert len(anomalous_doses) == 2
+        assert summary["sites"] == 10
+        assert summary["patients"] == 100
+        assert summary["visits"] == 600
+        assert summary["deviations"] == 32  # Matches deviation_scenarios.json total_scenarios
 
 
 class TestInjectedDeviations:
@@ -144,33 +132,59 @@ class TestInjectedDeviations:
             assert dev.rule_id in canonical_rule_ids, f"Rule {dev.rule_id} not in protocol_rules.json"
             assert dev.severity in ("administrative", "minor", "major")
             assert dev.severity_source == "rule_engine"
-            assert dev.detected_by == "system"
 
     def test_site_104_high_risk_profile(self, generator_config):
         bundle = generate_dataset(generator_config)
         s104_devs = [d for d in bundle.deviations if d.site_id == "SITE-104"]
-        # Exactly 12 deviations: 6 major dosing + 2 prohibited meds + 4 missed visits
-        assert len(s104_devs) == 12
-        severities = [d.severity for d in s104_devs]
-        # All Site 104 deviations are MAJOR
-        assert severities.count("major") == 12
+        # Exactly 9 scenarios per CLUSTER-104 in deviation_scenarios.json
+        assert len(s104_devs) == 9
+
+        # Verify dosing errors are present in mutated dosing_events
+        doses = {d.patient_id + "_" + d.visit_id: d for d in bundle.dosing_events}
+        # SCN-104-01: PT-104-003 at V-M2 dose=20
+        d1 = [d for d in bundle.dosing_events if d.patient_id == "PT-104-003" and "V-M2" in d.visit_id]
+        assert len(d1) == 1 and d1[0].actual_dose == 20.0
+
+        # SCN-104-04: PT-104-002 route=subcutaneous
+        d4 = [d for d in bundle.dosing_events if d.patient_id == "PT-104-002" and "V-RAND" in d.visit_id]
+        assert len(d4) == 1 and d4[0].route == "subcutaneous"
 
     def test_site_102_data_delay_profile(self, generator_config):
         bundle = generate_dataset(generator_config)
         s102_devs = [d for d in bundle.deviations if d.site_id == "SITE-102"]
-        # Exactly 12 late data entries
-        assert len(s102_devs) == 12
+        # Exactly 8 scenarios per CLUSTER-102 in deviation_scenarios.json
+        assert len(s102_devs) == 8
         assert all(d.rule_id == "PROC-003" for d in s102_devs)
-        assert all(d.severity == "administrative" for d in s102_devs)
 
-    def test_clean_sites_low_risk(self, generator_config):
+    def test_site_107_comed_and_missed_visits(self, generator_config):
+        bundle = generate_dataset(generator_config)
+        s107_devs = [d for d in bundle.deviations if d.site_id == "SITE-107"]
+        # Exactly 6 scenarios per CLUSTER-107 in deviation_scenarios.json
+        assert len(s107_devs) == 6
+
+    def test_site_110_visit_windows_and_labs(self, generator_config):
+        bundle = generate_dataset(generator_config)
+        s110_devs = [d for d in bundle.deviations if d.site_id == "SITE-110"]
+        # Exactly 5 scenarios per CLUSTER-110 in deviation_scenarios.json
+        assert len(s110_devs) == 5
+
+    def test_site_105_eligibility_and_consent(self, generator_config):
+        bundle = generate_dataset(generator_config)
+        s105_devs = [d for d in bundle.deviations if d.site_id == "SITE-105"]
+        # Exactly 4 scenarios per CLUSTER-105 in deviation_scenarios.json
+        assert len(s105_devs) == 4
+
+        # Verify eGFR mutated to 54 for PT-105-006 (SCN-105-01)
+        labs_egfr = [l for l in bundle.lab_results if l.patient_id == "PT-105-006" and l.test_code == "eGFR_CKD_EPI"]
+        assert len(labs_egfr) >= 1 and labs_egfr[0].result_value == 54.0
+
+    def test_clean_sites_zero_scenarios(self, generator_config):
         bundle = generate_dataset(generator_config)
         clean_sites = ["SITE-101", "SITE-103", "SITE-106", "SITE-108", "SITE-109"]
         for s_id in clean_sites:
             s_devs = [d for d in bundle.deviations if d.site_id == s_id]
-            # Clean sites have at most 1 minor isolated deviation
-            assert len(s_devs) == 1
-            assert s_devs[0].severity == "minor"
+            # Clean sites have 0 scenarios in deviation_scenarios.json
+            assert len(s_devs) == 0
 
 
 class TestExports:

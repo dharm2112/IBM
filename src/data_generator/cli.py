@@ -16,15 +16,12 @@ from .deviation_injector import DeviationInjector
 from .exporter import DatasetExporter
 
 
-def generate_dataset(config: GeneratorConfig) -> DatasetBundle:
-    """Orchestrates end-to-end dataset generation based on protocol.json, protocol_rules.json, and AACT."""
-    # 1. Load protocol and rules
+def generate_normal_dataset(config: GeneratorConfig, export: bool = False) -> DatasetBundle:
+    """Generates 100% compliant, normal baseline clinical data with zero protocol deviations."""
     loader = ProtocolLoader(config.protocol_json_path, config.protocol_rules_json_path)
-
-    # 2. Setup deterministic RNG
     rng = random.Random(config.random_seed)
 
-    # 3. Create sites grounded in AACT reference
+    # 1. Sites grounded in AACT reference
     sites = []
     for ref in AACT_SITES_REFERENCE[: config.num_sites]:
         site = Site(
@@ -41,11 +38,11 @@ def generate_dataset(config: GeneratorConfig) -> DatasetBundle:
         )
         sites.append(site)
 
-    # 4. Generate patients
+    # 2. Patients with verified eligibility
     patient_gen = PatientGenerator(loader, rng)
     patients = patient_gen.generate_patients_for_sites(sites, config.patients_per_site)
 
-    # 5. Generate visit schedules & clinical events
+    # 3. Visits & Clinical Events
     visit_gen = VisitScheduleGenerator(loader, rng)
     events_gen = ClinicalEventsGenerator(loader, rng)
 
@@ -54,25 +51,21 @@ def generate_dataset(config: GeneratorConfig) -> DatasetBundle:
     all_labs = []
     all_meds = []
     all_consents = []
+    all_audit_logs = []
 
     for patient in patients:
         p_visits = visit_gen.generate_visits_for_patient(patient)
-        p_dosing, p_labs, p_meds, p_consents = events_gen.generate_events_for_patient(patient, p_visits)
+        p_dosing, p_labs, p_meds, p_consents, p_audits = events_gen.generate_events_for_patient(patient, p_visits)
 
         all_visits.extend(p_visits)
         all_dosing.extend(p_dosing)
         all_labs.extend(p_labs)
         all_meds.extend(p_meds)
         all_consents.extend(p_consents)
+        all_audit_logs.extend(p_audits)
 
-    # 6. Inject controlled protocol deviations
-    injector = DeviationInjector(loader, rng)
-    deviations = injector.inject_all(
-        patients, all_visits, all_dosing, all_labs, all_meds, all_consents
-    )
-
-    # 7. Assemble DatasetBundle
-    bundle = DatasetBundle(
+    # Compliant dataset bundle with zero deviations
+    normal_bundle = DatasetBundle(
         sites=sites,
         patients=patients,
         visits=all_visits,
@@ -80,16 +73,69 @@ def generate_dataset(config: GeneratorConfig) -> DatasetBundle:
         lab_results=all_labs,
         medications=all_meds,
         consent_records=all_consents,
-        deviations=deviations,
+        audit_logs=all_audit_logs,
+        deviations=[],
         protocol_meta=loader.trial_metadata or AACT_TRIAL_METADATA,
         rules_meta=loader.rules_data.get("rules", []),
     )
 
-    # 8. Export to JSON, CSV, and SQL
-    exporter = DatasetExporter(config.output_dir)
-    exporter.export_all(bundle)
+    if export:
+        exporter = DatasetExporter(config.output_dir)
+        exporter.export_all(normal_bundle)
 
-    return bundle
+    return normal_bundle
+
+
+def generate_dataset(
+    config: GeneratorConfig,
+    scenarios_path: Optional[Path] = None,
+) -> DatasetBundle:
+    """Orchestrates the complete pipeline:
+    NORMAL DATA -> inject_deviations.py (deviation_scenarios.json) -> ABNORMAL CLINICAL EVENTS.
+    """
+    # 1. Generate NORMAL DATA baseline
+    normal_bundle = generate_normal_dataset(config, export=False)
+
+    # 2. Resolve deviation_scenarios.json path
+    scen_file = scenarios_path
+    if scen_file is None:
+        candidate_scenarios = [
+            config.base_dir / "src" / "protocol" / "deviations" / "deviation_scenarios.json",
+            config.base_dir / "src" / "protocol" / "deviation_scenarios.json",
+            config.base_dir / "deviation_scenarios.json",
+        ]
+        for p in candidate_scenarios:
+            if p.exists():
+                scen_file = p
+                break
+
+    # 3. If deviation_scenarios.json exists, apply via DeviationInjectorFromScenarios
+    if scen_file and scen_file.exists():
+        from .inject_deviations import DeviationInjectorFromScenarios
+
+        injector = DeviationInjectorFromScenarios(scen_file)
+        abnormal_bundle, _ = injector.apply_scenarios(normal_bundle)
+    else:
+        # Fallback to programmatic injector
+        loader = ProtocolLoader(config.protocol_json_path, config.protocol_rules_json_path)
+        rng = random.Random(config.random_seed)
+        p_injector = DeviationInjector(loader, rng)
+        deviations = p_injector.inject_all(
+            normal_bundle.patients,
+            normal_bundle.visits,
+            normal_bundle.dosing_events,
+            normal_bundle.lab_results,
+            normal_bundle.medications,
+            normal_bundle.consent_records,
+        )
+        normal_bundle.deviations = deviations
+        abnormal_bundle = normal_bundle
+
+    # 4. Export ABNORMAL CLINICAL EVENTS
+    exporter = DatasetExporter(config.output_dir)
+    exporter.export_all(abnormal_bundle)
+
+    return abnormal_bundle
 
 
 def main():

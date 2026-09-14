@@ -128,6 +128,26 @@ class ConsentRecord:
 
 
 @dataclass
+class AuditLog:
+    log_id: str
+    entity_type: str
+    entity_id: str
+    action: str
+    performed_by: str
+    performed_at: str
+    old_value: Optional[Dict[str, Any]] = None
+    new_value: Optional[Dict[str, Any]] = None
+    patient_id: Optional[str] = None
+    site_id: Optional[str] = None
+    ip_address: Optional[str] = "10.0.0.1"
+    session_id: Optional[str] = "sess-001"
+    created_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class Deviation:
     deviation_id: str
     patient_id: str
@@ -158,6 +178,7 @@ class DatasetBundle:
     lab_results: List[LabResult] = field(default_factory=list)
     medications: List[Medication] = field(default_factory=list)
     consent_records: List[ConsentRecord] = field(default_factory=list)
+    audit_logs: List[AuditLog] = field(default_factory=list)
     deviations: List[Deviation] = field(default_factory=list)
     protocol_meta: Dict[str, Any] = field(default_factory=dict)
     rules_meta: List[Dict[str, Any]] = field(default_factory=list)
@@ -171,5 +192,6 @@ class DatasetBundle:
             "lab_results": len(self.lab_results),
             "medications": len(self.medications),
             "consent_records": len(self.consent_records),
+            "audit_logs": len(self.audit_logs),
             "deviations": len(self.deviations),
         }

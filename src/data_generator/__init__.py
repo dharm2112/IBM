@@ -15,6 +15,7 @@ from .models import (
     LabResult,
     Medication,
     ConsentRecord,
+    AuditLog,
     Deviation,
     DatasetBundle,
 )
@@ -23,7 +24,9 @@ from .patient_generator import PatientGenerator
 from .visit_schedule_generator import VisitScheduleGenerator
 from .clinical_events_generator import ClinicalEventsGenerator
 from .deviation_injector import DeviationInjector
+from .inject_deviations import DeviationInjectorFromScenarios, inject_deviations_pipeline
 from .exporter import DatasetExporter
+from .cli import generate_normal_dataset, generate_dataset
 
 __all__ = [
     "GeneratorConfig",
@@ -34,6 +37,7 @@ __all__ = [
     "LabResult",
     "Medication",
     "ConsentRecord",
+    "AuditLog",
     "Deviation",
     "DatasetBundle",
     "ProtocolLoader",
@@ -41,5 +45,9 @@ __all__ = [
     "VisitScheduleGenerator",
     "ClinicalEventsGenerator",
     "DeviationInjector",
+    "DeviationInjectorFromScenarios",
+    "inject_deviations_pipeline",
     "DatasetExporter",
+    "generate_normal_dataset",
+    "generate_dataset",
 ]
