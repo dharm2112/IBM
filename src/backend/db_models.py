@@ -1,0 +1,183 @@
+"""
+src/backend/db_models.py
+─────────────────────────
+SQLAlchemy ORM models for integration-layer persistence.
+
+Design principles
+─────────────────
+• These models persist only the OUTPUTS of Member 1's deterministic pipeline:
+  DetectedDeviation results and SiteRiskScore results.
+• They do NOT duplicate Member 1's domain dataclasses — they are thin storage
+  wrappers that map dataclass fields to table columns.
+• Severity and risk_score are stored verbatim from the rule engine.
+  The AI layer reads them; it NEVER writes back to these columns.
+
+Tables
+──────
+  detected_deviations  — one row per DetectedDeviation from the rule engine
+  site_risk_scores     — one row per SiteRiskScore (latest run per site)
+
+Run-tracking
+─────────────
+  engine_runs — lightweight log of each /run-engine execution with summary stats.
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+
+from src.backend.database import Base
+
+
+# ---------------------------------------------------------------------------
+# EngineRun — audit log of /run-engine executions
+# ---------------------------------------------------------------------------
+
+
+class EngineRun(Base):
+    """Lightweight record of each rule-engine execution."""
+
+    __tablename__ = "engine_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String(64), unique=True, nullable=False, index=True)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String(16), default="running", nullable=False)  # running|completed|failed
+
+    # Summary stats
+    sites_count = Column(Integer, default=0)
+    patients_count = Column(Integer, default=0)
+    deviations_detected = Column(Integer, default=0)
+    sites_scored = Column(Integer, default=0)
+    high_risk_sites = Column(Integer, default=0)
+
+    error_message = Column(Text, nullable=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "run_id": self.run_id,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "status": self.status,
+            "sites_count": self.sites_count,
+            "patients_count": self.patients_count,
+            "deviations_detected": self.deviations_detected,
+            "sites_scored": self.sites_scored,
+            "high_risk_sites": self.high_risk_sites,
+            "error_message": self.error_message,
+        }
+
+
+# ---------------------------------------------------------------------------
+# DetectedDeviationRecord — persisted output of TrialGuardRuleEngine
+# ---------------------------------------------------------------------------
+
+
+class DetectedDeviationRecord(Base):
+    """
+    Stores one DetectedDeviation as produced by TrialGuardRuleEngine.evaluate().
+
+    severity is written once by the rule engine and NEVER overwritten by AI.
+    """
+
+    __tablename__ = "detected_deviations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+
+    # Fields from rule_engine.models.DetectedDeviation
+    deviation_id = Column(String(64), nullable=False, index=True)
+    site_id = Column(String(64), nullable=False, index=True)
+    patient_id = Column(String(64), nullable=False, index=True)
+    visit_id = Column(String(64), nullable=True)
+    rule_id = Column(String(64), nullable=False)
+    category = Column(String(64), nullable=False)
+    description = Column(Text, nullable=False)
+    expected = Column(Text, nullable=True)    # serialised as string
+    actual = Column(Text, nullable=True)      # serialised as string
+    severity = Column(String(32), nullable=False)   # 'major'|'minor'|'administrative'
+    protocol_reference = Column(Text, nullable=True)  # JSON string
+    status = Column(String(32), default="open")
+    detected_at = Column(String(64), nullable=True)
+    detected_by = Column(String(64), default="system")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> dict:
+        return {
+            "deviation_id": self.deviation_id,
+            "site_id": self.site_id,
+            "patient_id": self.patient_id,
+            "visit_id": self.visit_id,
+            "rule_id": self.rule_id,
+            "category": self.category,
+            "description": self.description,
+            "expected": self.expected,
+            "actual": self.actual,
+            "severity": self.severity,
+            "status": self.status,
+            "detected_at": self.detected_at,
+            "detected_by": self.detected_by,
+        }
+
+
+# ---------------------------------------------------------------------------
+# SiteRiskScoreRecord — persisted output of score_all_sites()
+# ---------------------------------------------------------------------------
+
+
+class SiteRiskScoreRecord(Base):
+    """
+    Stores one SiteRiskScore as produced by score_all_sites().
+
+    risk_score and risk_level are written once by the deterministic engine.
+    The AI layer reads them from here; it NEVER modifies these columns.
+    """
+
+    __tablename__ = "site_risk_scores"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+
+    # Fields from rule_engine.models.SiteRiskScore
+    site_id = Column(String(64), nullable=False, index=True)
+    risk_score = Column(Float, nullable=False)        # 0.0 – 100.0
+    risk_level = Column(String(16), nullable=False)   # 'LOW'|'MEDIUM'|'HIGH'
+    total_deviations = Column(Integer, default=0)
+    major_count = Column(Integer, default=0)
+    minor_count = Column(Integer, default=0)
+    administrative_count = Column(Integer, default=0)
+    unique_rules_violated = Column(Integer, default=0)
+    dosing_rule_violations = Column(Integer, default=0)
+    missed_safety_visits = Column(Integer, default=0)
+    top_risk_drivers = Column(Text, nullable=True)    # JSON array string
+    components = Column(Text, nullable=True)           # JSON object string
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self) -> dict:
+        return {
+            "site_id": self.site_id,
+            "risk_score": self.risk_score,
+            "risk_level": self.risk_level,
+            "total_deviations": self.total_deviations,
+            "major_count": self.major_count,
+            "minor_count": self.minor_count,
+            "administrative_count": self.administrative_count,
+            "unique_rules_violated": self.unique_rules_violated,
+            "dosing_rule_violations": self.dosing_rule_violations,
+            "missed_safety_visits": self.missed_safety_visits,
+            "top_risk_drivers": json.loads(self.top_risk_drivers or "[]"),
+            "components": json.loads(self.components or "{}"),
+        }

@@ -3,7 +3,7 @@
 import random
 from datetime import datetime, timedelta
 from typing import List, Tuple
-from .models import Patient, Visit, DosingEvent, LabResult, Medication, ConsentRecord
+from .models import Patient, Visit, DosingEvent, LabResult, Medication, ConsentRecord, AuditLog
 from .protocol_loader import ProtocolLoader
 
 
@@ -16,24 +16,26 @@ class ClinicalEventsGenerator:
 
     def generate_events_for_patient(
         self, patient: Patient, visits: List[Visit]
-    ) -> Tuple[List[DosingEvent], List[LabResult], List[Medication], List[ConsentRecord]]:
+    ) -> Tuple[List[DosingEvent], List[LabResult], List[Medication], List[ConsentRecord], List[AuditLog]]:
         """Generates all compliant clinical events for a patient."""
         dosing_events: List[DosingEvent] = []
         lab_results: List[LabResult] = []
         medications: List[Medication] = []
         consent_records: List[ConsentRecord] = []
+        audit_logs: List[AuditLog] = []
 
         # Map visits by visit_type
         visit_map = {v.visit_type: v for v in visits}
 
-        # 1. Consent Records
+        # 1. Consent Records & Audit Logs
         # PROC-001: Initial consent signed on or before screening visit
         screen_visit = visit_map["V-SCREEN"]
         screen_dt = datetime.strptime(screen_visit.actual_date or screen_visit.scheduled_date, "%Y-%m-%d")
         consent_dt = screen_dt - timedelta(days=self.rng.randint(0, 3))
+        icf_id = f"CNS-{patient.patient_code}-01"
         consent_records.append(
             ConsentRecord(
-                consent_id=f"CNS-{patient.patient_code}-01",
+                consent_id=icf_id,
                 patient_id=patient.patient_id,
                 consent_type="initial_icf",
                 consent_date=consent_dt.strftime("%Y-%m-%d"),
@@ -42,19 +44,46 @@ class ClinicalEventsGenerator:
                 created_at=f"{consent_dt.strftime('%Y-%m-%d')}T09:00:00Z",
             )
         )
+        audit_logs.append(
+            AuditLog(
+                log_id=f"LOG-{patient.patient_code}-01",
+                entity_type="consent",
+                entity_id=icf_id,
+                action="consent_signed",
+                performed_by="Principal Investigator",
+                performed_at=f"{consent_dt.strftime('%Y-%m-%d')}T09:00:00Z",
+                patient_id=patient.patient_id,
+                site_id=patient.site_id,
+                created_at=f"{consent_dt.strftime('%Y-%m-%d')}T09:00:00Z",
+            )
+        )
 
         # PROC-002: Protocol Amendment 4 Re-consent (effective 2015-06-01)
         # Compliant: signed within 14 days (e.g., 2015-06-08)
         amendment_dt = datetime(2015, 6, 1)
         reconsent_dt = amendment_dt + timedelta(days=self.rng.randint(3, 10))
+        amend_icf_id = f"CNS-{patient.patient_code}-02"
         consent_records.append(
             ConsentRecord(
-                consent_id=f"CNS-{patient.patient_code}-02",
+                consent_id=amend_icf_id,
                 patient_id=patient.patient_id,
                 consent_type="amendment_reconsent",
                 consent_date=reconsent_dt.strftime("%Y-%m-%d"),
                 version="Amendment 4",
                 signed=True,
+                created_at=f"{reconsent_dt.strftime('%Y-%m-%d')}T10:30:00Z",
+            )
+        )
+        audit_logs.append(
+            AuditLog(
+                log_id=f"LOG-{patient.patient_code}-02",
+                entity_type="consent",
+                entity_id=amend_icf_id,
+                action="amendment_reconsent_signed",
+                performed_by="Principal Investigator",
+                performed_at=f"{reconsent_dt.strftime('%Y-%m-%d')}T10:30:00Z",
+                patient_id=patient.patient_id,
+                site_id=patient.site_id,
                 created_at=f"{reconsent_dt.strftime('%Y-%m-%d')}T10:30:00Z",
             )
         )
@@ -230,4 +259,4 @@ class ClinicalEventsGenerator:
                 )
             )
 
-        return dosing_events, lab_results, medications, consent_records
+        return dosing_events, lab_results, medications, consent_records, audit_logs

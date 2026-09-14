@@ -28,15 +28,20 @@ class PatientGenerator:
 
             for i in range(1, patients_per_site + 1):
                 patient_code = f"PT-{site_code}-{i:03d}"
-                patient_id = f"PAT-{site_code}-{i:03d}"
+                patient_id = patient_code
 
                 # Stagger enrollment 14 to 120 days after site activation
                 days_after_activation = self.rng.randint(14, 120)
                 enrollment_dt = site_activation + timedelta(days=days_after_activation)
                 enrollment_date = enrollment_dt.strftime("%Y-%m-%d")
 
-                # Arm: Alternate or 1:1 balance
-                arm = arms[(i - 1) % 2]
+                # Arm: Site 104 patients 1-9 have active dosing scenarios in deviation_scenarios.json
+                if site_code == "104":
+                    arm = "ARM-ACTIVE" if i <= 9 else "ARM-PLACEBO"
+                elif site_code == "103":
+                    arm = "ARM-PLACEBO" if i <= 9 else "ARM-ACTIVE"
+                else:
+                    arm = arms[(i - 1) % 2]
 
                 # Demographic: Age >= 40 at screening (ELIG-001)
                 # DECLARE-TIMI 58 average age ~64, range 40-80

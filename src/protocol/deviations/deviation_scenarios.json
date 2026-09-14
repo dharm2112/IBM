@@ -1,0 +1,808 @@
+{
+  "meta": {
+    "schema_version": "1.0.0",
+    "protocol_id": "PROTO-DECLARE-TIMI58-V1",
+    "nct_id": "NCT01986881",
+    "generated_by": "Member 1 — Protocol Design",
+    "purpose": "Injection instructions for the TrialGuard synthetic-data generator. Each scenario tells the generator WHICH source record to mutate, HOW to mutate it, and WHAT the rule engine should then detect. The generator does NOT insert pre-built deviation rows. It modifies seed events so the deterministic rule engine (DOSE/VISIT/MED/LAB/PROC rules) discovers violations during its normal evaluation pass.",
+    "important": [
+      "These are INSTRUCTIONS, not pre-built deviation records.",
+      "The generator mutates the source table/field listed in 'mutation'. The rule engine then fires and creates the deviations table row.",
+      "Each scenario maps to exactly one rule_id in protocol_rules.json.",
+      "Scenario IDs are stable references: SCN-104-01, SCN-102-01, etc.",
+      "cluster_narrative explains why a group of scenarios at the same site is clinically coherent."
+    ],
+    "site_risk_intent": {
+      "site_104": "HIGH — 9 scenarios: major dosing errors pattern, route error, double-dose, prohibited med, compliance collapse",
+      "site_102": "MEDIUM-TRENDING — 8 scenarios: systematic eCRF data-entry lag that triggers the PROC-003 escalation path",
+      "site_107": "MEDIUM — 6 scenarios: warfarin co-medication without notification, missed safety visit, new insulin without approval",
+      "site_110": "MEDIUM — 5 scenarios: visit-window violations, missing eGFR at safety-critical visits",
+      "site_105": "MEDIUM — 4 scenarios: eligibility lab violation, consent before procedure missing, amendment re-consent delay"
+    },
+    "total_scenarios": 32
+  },
+
+  "clusters": [
+
+    {
+      "cluster_id": "CLUSTER-104",
+      "site_id": "104",
+      "site_name": "City General Hospital, Houston TX USA",
+      "risk_intent": "HIGH",
+      "cluster_narrative": "Site 104 has a pattern of drug-dispensing process failures concentrated in the study pharmacy. Three patients received wrong doses across different visits (suggesting a labelling/stock-control problem), one patient was administered study drug via the wrong route, one patient was double-dosed on the same calendar day (dispensing log error), one patient started a prohibited SGLT2 inhibitor prescribed by an outside cardiologist, and a further patient fell below the critical 50% compliance threshold at annual assessment — triggering the DOSE-002 major escalation. Together these produce a site risk score dominated by MajorDevCount and DosingErrors components.",
+      "scenarios": [
+
+        {
+          "scenario_id": "SCN-104-01",
+          "patient_id": "PT-104-003",
+          "visit_id": "V-M2",
+          "rule_id": "DOSE-003",
+          "deviation_type": "dose_value_wrong",
+          "narrative": "Study drug stock for PT-104-003 at Month 2 was picked from the wrong dispensing tray. The patient received 20 mg (two tablets) instead of the protocol-specified 10 mg single tablet. The dosing_events record shows actual_dose=20, drug_code='DAPAGLI-10', route='oral'. DOSE-003 fires because actual_dose != 10.",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-003' AND visit_id = 'V-M2' AND drug_code = 'DAPAGLI-10'",
+            "field": "actual_dose",
+            "operation": "SET",
+            "value": 20,
+            "unit": "mg"
+          },
+          "expected": { "field": "actual_dose", "value": 10, "unit": "mg" },
+          "actual":   { "field": "actual_dose", "value": 20, "unit": "mg" },
+          "severity": "major",
+          "rule_engine_check": "dosing_events.actual_dose != 10 WHERE drug_code='DAPAGLI-10'"
+        },
+
+        {
+          "scenario_id": "SCN-104-02",
+          "patient_id": "PT-104-005",
+          "visit_id": "V-M6",
+          "rule_id": "DOSE-003",
+          "deviation_type": "dose_value_wrong",
+          "narrative": "PT-104-005 was dispensed 5 mg (half-tablet) at Month 6 by a locum pharmacist who was unfamiliar with the fixed-dose protocol requirement. actual_dose=5 in dosing_events. DOSE-003 fires: actual_dose(5) != expected(10).",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-005' AND visit_id = 'V-M6' AND drug_code = 'DAPAGLI-10'",
+            "field": "actual_dose",
+            "operation": "SET",
+            "value": 5,
+            "unit": "mg"
+          },
+          "expected": { "field": "actual_dose", "value": 10, "unit": "mg" },
+          "actual":   { "field": "actual_dose", "value": 5, "unit": "mg" },
+          "severity": "major",
+          "rule_engine_check": "dosing_events.actual_dose != 10 WHERE drug_code='DAPAGLI-10'"
+        },
+
+        {
+          "scenario_id": "SCN-104-03",
+          "patient_id": "PT-104-007",
+          "visit_id": "V-M12",
+          "rule_id": "DOSE-003",
+          "deviation_type": "dose_value_wrong",
+          "narrative": "PT-104-007 was dispensed 20 mg at Month 12 — the same stock error as SCN-104-01 recurred, indicating the site failed to correct the root cause after the first event. This repeat violation at the same site with the same rule is a pattern indicator for the site risk RepeatDev component.",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-007' AND visit_id = 'V-M12' AND drug_code = 'DAPAGLI-10'",
+            "field": "actual_dose",
+            "operation": "SET",
+            "value": 20,
+            "unit": "mg"
+          },
+          "expected": { "field": "actual_dose", "value": 10, "unit": "mg" },
+          "actual":   { "field": "actual_dose", "value": 20, "unit": "mg" },
+          "severity": "major",
+          "rule_engine_check": "dosing_events.actual_dose != 10 WHERE drug_code='DAPAGLI-10'",
+          "repeat_rule_flag": true,
+          "repeat_of_scenario": "SCN-104-01"
+        },
+
+        {
+          "scenario_id": "SCN-104-04",
+          "patient_id": "PT-104-002",
+          "visit_id": "V-RAND",
+          "rule_id": "DOSE-004",
+          "deviation_type": "wrong_administration_route",
+          "narrative": "At the randomisation visit for PT-104-002, the dispensing nurse documented route='subcutaneous' in the eCRF — a transcription error (the drug is oral-only). The patient did in fact take the tablet orally, but the recorded route is wrong in dosing_events. DOSE-004 fires: dosing_events.route != 'oral'. Note: even a transcription error is a protocol deviation under GCP because the source record is inaccurate.",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-002' AND visit_id = 'V-RAND' AND drug_code = 'DAPAGLI-10'",
+            "field": "route",
+            "operation": "SET",
+            "value": "subcutaneous"
+          },
+          "expected": { "field": "route", "value": "oral" },
+          "actual":   { "field": "route", "value": "subcutaneous" },
+          "severity": "major",
+          "rule_engine_check": "dosing_events.route != 'oral' WHERE drug_code='DAPAGLI-10'"
+        },
+
+        {
+          "scenario_id": "SCN-104-05",
+          "patient_id": "PT-104-008",
+          "visit_id": "V-M2",
+          "rule_id": "DOSE-005",
+          "deviation_type": "double_dose_same_day",
+          "narrative": "The dispensing log at Site 104 for PT-104-008 on the Month 2 visit date contains two dosing_events rows with drug_code='DAPAGLI-10' on the same calendar date. One is the clinic-administered dose; the second was entered by a different staff member who did not check the log. DOSE-005 fires: COUNT(doses on same day) > 1.",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-008' AND visit_id = 'V-M2'",
+            "operation": "INSERT_DUPLICATE",
+            "duplicate_fields": {
+              "drug_code": "DAPAGLI-10",
+              "actual_dose": 10,
+              "dose_unit": "mg",
+              "route": "oral",
+              "administration_date": "SAME_DATE_AS_EXISTING_V-M2_RECORD",
+              "administered_by": "STAFF-104-NURSE-B"
+            },
+            "note": "Insert a second dosing_events row on the same calendar date for the same patient and drug_code."
+          },
+          "expected": { "description": "1 dose per calendar day", "value": 1, "unit": "doses" },
+          "actual":   { "description": "2 doses on same calendar day", "value": 2, "unit": "doses" },
+          "severity": "major",
+          "rule_engine_check": "COUNT(dosing_events WHERE drug_code='DAPAGLI-10' AND DATE(administration_date)=target_date AND patient_id=p) > 1"
+        },
+
+        {
+          "scenario_id": "SCN-104-06",
+          "patient_id": "PT-104-009",
+          "visit_id": "V-RAND",
+          "rule_id": "DOSE-001",
+          "deviation_type": "first_dose_missing",
+          "narrative": "PT-104-009 was randomised to ARM-ACTIVE but the randomisation visit dispensing record was never created — the pharmacist was called away mid-visit and the dispensing step was skipped. No dosing_events row exists for this patient at V-RAND. DOSE-001 fires: no dosing_events record with visit_id='V-RAND' for ARM-ACTIVE patient.",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-009' AND visit_id = 'V-RAND'",
+            "operation": "DELETE",
+            "note": "Remove the first-dose dispensing record for PT-104-009 at V-RAND entirely. The generator should not create this row during seeding."
+          },
+          "expected": { "description": "dosing_events row present for V-RAND", "present_required": true },
+          "actual":   { "description": "no dosing_events row for V-RAND", "present_required": false },
+          "severity": "major",
+          "rule_engine_check": "NOT EXISTS(dosing_events WHERE patient_id=p AND visit_id='V-RAND') AND patients.arm='ARM-ACTIVE'"
+        },
+
+        {
+          "scenario_id": "SCN-104-07",
+          "patient_id": "PT-104-010",
+          "visit_id": "ALL",
+          "rule_id": "MED-001",
+          "deviation_type": "prohibited_concomitant_medication",
+          "narrative": "PT-104-010 was seen by an external cardiologist who prescribed empagliflozin 10 mg QD for additional cardiovascular protection, unaware the patient was enrolled in the DECLARE-TIMI 58 trial. The site captured this in the concomitant medications log. MED-001 fires: medications.drug_name IN prohibited_list ('empagliflozin').",
+          "mutation": {
+            "table": "medications",
+            "filter": "patient_id = 'PT-104-010'",
+            "operation": "INSERT",
+            "insert_fields": {
+              "drug_name": "empagliflozin",
+              "drug_class": "SGLT2 inhibitor",
+              "dose": "10 mg QD",
+              "start_date": "ENROLLMENT_DATE + 45 days",
+              "end_date": null,
+              "indication": "cardiovascular protection",
+              "reported_by": "external cardiologist"
+            }
+          },
+          "expected": { "description": "No SGLT2 inhibitor other than dapagliflozin in medications", "prohibited_list": ["empagliflozin"] },
+          "actual":   { "description": "empagliflozin 10 mg QD started Day +45", "drug_name": "empagliflozin" },
+          "severity": "major",
+          "rule_engine_check": "medications.drug_name IN ('canagliflozin','empagliflozin','ertugliflozin',...) AND medications.start_date <= study_end_date"
+        },
+
+        {
+          "scenario_id": "SCN-104-08",
+          "patient_id": "PT-104-004",
+          "visit_id": "V-M12",
+          "rule_id": "DOSE-002",
+          "deviation_type": "dose_compliance_below_threshold",
+          "narrative": "PT-104-004 pill count at Month 12 annual assessment shows compliance_pct=42. This falls below both the 70% minor threshold and the 50% critical escalation threshold, making this a MAJOR deviation. The patient had a personal crisis between months 9-12 and stopped taking medication for extended periods.",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-004' AND visit_id = 'V-M12'",
+            "field": "compliance_pct",
+            "operation": "SET",
+            "value": 42,
+            "unit": "%"
+          },
+          "expected": { "field": "compliance_pct", "value": 70, "unit": "%" },
+          "actual":   { "field": "compliance_pct", "value": 42, "unit": "%" },
+          "severity": "major",
+          "severity_path": "DOSE-002 base=minor → escalated to major because compliance_pct < 50",
+          "rule_engine_check": "dosing_events.compliance_pct < 70 AND visit_id IN ('V-M12','V-EOS'); THEN compliance_pct < 50 → escalate to major"
+        },
+
+        {
+          "scenario_id": "SCN-104-09",
+          "patient_id": "PT-104-006",
+          "visit_id": "V-M6",
+          "rule_id": "DOSE-002",
+          "deviation_type": "dose_compliance_below_threshold",
+          "narrative": "PT-104-006 compliance_pct at Month 6 assessment = 61%. This falls below the 70% threshold (minor). Unlike SCN-104-08, it does not cross the 50% major escalation threshold. This is a standalone minor deviation that contributes to site 104's DosingErrors component without escalating.",
+          "mutation": {
+            "table": "dosing_events",
+            "filter": "patient_id = 'PT-104-006' AND visit_id = 'V-M6'",
+            "field": "compliance_pct",
+            "operation": "SET",
+            "value": 61,
+            "unit": "%"
+          },
+          "expected": { "field": "compliance_pct", "value": 70, "unit": "%" },
+          "actual":   { "field": "compliance_pct", "value": 61, "unit": "%" },
+          "severity": "minor",
+          "rule_engine_check": "dosing_events.compliance_pct < 70 AND visit_id IN ('V-M12','V-EOS')"
+        }
+
+      ]
+    },
+
+    {
+      "cluster_id": "CLUSTER-102",
+      "site_id": "102",
+      "site_name": "Westside Research Clinic, Los Angeles CA USA",
+      "risk_intent": "MEDIUM-TRENDING-TO-HIGH",
+      "cluster_narrative": "Site 102 does not have safety-critical dosing or medication errors. Its problem is systematic eCRF data-entry lag. The site coordinator position was vacant for 6 weeks; the backup coordinator was inexperienced and managing two concurrent studies. The result is 8 visits across 4 patients with entry lags ranging from 8 to 22 business days. Three of these lags exceed 10 business days consecutively for the same patient, triggering the PROC-003 escalation from administrative to minor at the site level. The DataDelay component of the site risk score is maximised.",
+      "scenarios": [
+
+        {
+          "scenario_id": "SCN-102-01",
+          "patient_id": "PT-102-002",
+          "visit_id": "V-RAND",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Randomisation visit eCRF for PT-102-002 was entered 9 business days after the visit date. The site coordinator was absent the following week.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-002' AND visit_id = 'V-RAND'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 9 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 9 business days", "lag_business_days": 9 },
+          "severity": "administrative",
+          "rule_engine_check": "BUSINESS_DAYS(visits.data_entry_date, visits.actual_date) > 5"
+        },
+
+        {
+          "scenario_id": "SCN-102-02",
+          "patient_id": "PT-102-002",
+          "visit_id": "V-M2",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Month 2 visit for PT-102-002 — lag is 12 business days. This is the second consecutive visit with lag > 5 days for this patient.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-002' AND visit_id = 'V-M2'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 12 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 12 business days", "lag_business_days": 12 },
+          "severity": "administrative",
+          "rule_engine_check": "BUSINESS_DAYS(visits.data_entry_date, visits.actual_date) > 5"
+        },
+
+        {
+          "scenario_id": "SCN-102-03",
+          "patient_id": "PT-102-002",
+          "visit_id": "V-M6",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Month 6 visit for PT-102-002 — lag is 14 business days. This is the THIRD consecutive visit with lag > 10 business days. The PROC-003 escalation condition fires at the site level: 3 consecutive visits with lag > 10 business days → minor site-level deviation, DataDelay component increases.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-002' AND visit_id = 'V-M6'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 14 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 14 business days", "lag_business_days": 14 },
+          "severity": "minor",
+          "severity_path": "PROC-003 base=administrative → escalated to minor: 3 consecutive visits for same patient with lag > 10 business days",
+          "rule_engine_check": "BUSINESS_DAYS > 5 AND site-level: ≥3 consecutive visits with lag > 10 business days"
+        },
+
+        {
+          "scenario_id": "SCN-102-04",
+          "patient_id": "PT-102-005",
+          "visit_id": "V-RAND",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Randomisation visit for PT-102-005 — lag 8 business days. The backup coordinator had not yet received eCRF training confirmation.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-005' AND visit_id = 'V-RAND'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 8 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 8 business days", "lag_business_days": 8 },
+          "severity": "administrative",
+          "rule_engine_check": "BUSINESS_DAYS(visits.data_entry_date, visits.actual_date) > 5"
+        },
+
+        {
+          "scenario_id": "SCN-102-05",
+          "patient_id": "PT-102-005",
+          "visit_id": "V-M2",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Month 2 visit for PT-102-005 — lag 11 business days. Second consecutive visit > 10 business days for this patient.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-005' AND visit_id = 'V-M2'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 11 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 11 business days", "lag_business_days": 11 },
+          "severity": "administrative",
+          "rule_engine_check": "BUSINESS_DAYS(visits.data_entry_date, visits.actual_date) > 5"
+        },
+
+        {
+          "scenario_id": "SCN-102-06",
+          "patient_id": "PT-102-005",
+          "visit_id": "V-M6",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Month 6 visit for PT-102-005 — lag 22 business days. The worst single lag at the site. Third consecutive visit > 10 days → second escalation at site level, further raising DataDelay component.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-005' AND visit_id = 'V-M6'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 22 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 22 business days", "lag_business_days": 22 },
+          "severity": "minor",
+          "severity_path": "PROC-003 base=administrative → escalated to minor: ≥3 consecutive visits with lag > 10 business days",
+          "rule_engine_check": "BUSINESS_DAYS > 5 AND site-level: ≥3 consecutive visits with lag > 10 business days"
+        },
+
+        {
+          "scenario_id": "SCN-102-07",
+          "patient_id": "PT-102-008",
+          "visit_id": "V-M12",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Month 12 visit for PT-102-008 — lag 7 business days. The site had a new coordinator by this point but the backlog from prior months had not cleared the queue.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-008' AND visit_id = 'V-M12'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 7 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 7 business days", "lag_business_days": 7 },
+          "severity": "administrative",
+          "rule_engine_check": "BUSINESS_DAYS(visits.data_entry_date, visits.actual_date) > 5"
+        },
+
+        {
+          "scenario_id": "SCN-102-08",
+          "patient_id": "PT-102-003",
+          "visit_id": "V-M2",
+          "rule_id": "PROC-003",
+          "deviation_type": "late_data_entry",
+          "narrative": "Month 2 visit for PT-102-003 — lag 18 business days. The site coordinator vacancy period covered this visit entirely; the backup entered data only when they returned.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-102-003' AND visit_id = 'V-M2'",
+            "field": "data_entry_date",
+            "operation": "SET",
+            "value": "actual_date + 18 business days"
+          },
+          "expected": { "field": "data_entry_date", "description": "within 5 business days of actual_date" },
+          "actual":   { "field": "data_entry_date", "description": "actual_date + 18 business days", "lag_business_days": 18 },
+          "severity": "administrative",
+          "rule_engine_check": "BUSINESS_DAYS(visits.data_entry_date, visits.actual_date) > 5"
+        }
+
+      ]
+    },
+
+    {
+      "cluster_id": "CLUSTER-107",
+      "site_id": "107",
+      "site_name": "North Medical Center, Toronto Canada",
+      "risk_intent": "MEDIUM",
+      "cluster_narrative": "Site 107 has a medication safety pattern: two patients started warfarin during the study without Medical Monitor notification (prescribed by external cardiologists for newly diagnosed atrial fibrillation). One of these patients also missed the Month 6 mandatory safety visit. A fourth patient began insulin therapy without approval. Together these scenarios activate MED-003, VISIT-003, and MED-004, raising the ProhibitedMeds and MissedVisits components of the site risk score.",
+      "scenarios": [
+
+        {
+          "scenario_id": "SCN-107-01",
+          "patient_id": "PT-107-004",
+          "visit_id": "ALL",
+          "rule_id": "MED-003",
+          "deviation_type": "prohibited_concomitant_medication",
+          "narrative": "PT-107-004 was diagnosed with new-onset atrial fibrillation between the Month 2 and Month 6 visits. The patient's cardiologist (outside the study site) initiated warfarin 5 mg daily. The site coordinator was not informed until the Month 6 concomitant medication review. No Medical Monitor notification was filed. MED-003 fires: medications.drug_name='warfarin', start_date after enrollment, no monitoring_notification record.",
+          "mutation": {
+            "table": "medications",
+            "filter": "patient_id = 'PT-107-004'",
+            "operation": "INSERT",
+            "insert_fields": {
+              "drug_name": "warfarin",
+              "drug_class": "vitamin_K_antagonist",
+              "dose": "5 mg daily",
+              "start_date": "ENROLLMENT_DATE + 75 days",
+              "end_date": null,
+              "indication": "atrial fibrillation",
+              "reported_by": "external cardiologist"
+            },
+            "also_ensure": "No monitoring_notification row exists for patient_id='PT-107-004' and drug_code='warfarin'"
+          },
+          "expected": { "description": "No warfarin without Medical Monitor notification" },
+          "actual":   { "description": "warfarin 5 mg daily from Day +75 with no notification on file", "drug_name": "warfarin", "start_day": "+75" },
+          "severity": "major",
+          "rule_engine_check": "medications.drug_class='vitamin_K_antagonist' AND medications.start_date >= enrollment_date AND monitoring_notification IS NULL"
+        },
+
+        {
+          "scenario_id": "SCN-107-02",
+          "patient_id": "PT-107-008",
+          "visit_id": "ALL",
+          "rule_id": "MED-003",
+          "deviation_type": "prohibited_concomitant_medication",
+          "narrative": "PT-107-008 also received warfarin (acenocoumarol 3 mg daily, a VKA equivalent) from a GP for a deep-vein thrombosis diagnosed between the screening and randomisation visits — but this was not disclosed at randomisation and was only discovered at Month 2 when the patient mentioned it. MED-003 fires for acenocoumarol (which appears in the prohibited_list). This is a second warfarin-class event at Site 107, raising the ProhibitedMeds component to near-maximum.",
+          "mutation": {
+            "table": "medications",
+            "filter": "patient_id = 'PT-107-008'",
+            "operation": "INSERT",
+            "insert_fields": {
+              "drug_name": "acenocoumarol",
+              "drug_class": "vitamin_K_antagonist",
+              "dose": "3 mg daily",
+              "start_date": "ENROLLMENT_DATE + 10 days",
+              "end_date": null,
+              "indication": "deep-vein thrombosis",
+              "reported_by": "patient self-report at V-M2"
+            },
+            "also_ensure": "No monitoring_notification row exists for patient_id='PT-107-008' and drug_code='acenocoumarol'"
+          },
+          "expected": { "description": "No vitamin K antagonist without Medical Monitor notification" },
+          "actual":   { "description": "acenocoumarol 3 mg daily from Day +10 with no notification on file", "drug_name": "acenocoumarol" },
+          "severity": "major",
+          "rule_engine_check": "medications.drug_name IN ('warfarin','acenocoumarol','phenprocoumon','fluindione') AND monitoring_notification IS NULL"
+        },
+
+        {
+          "scenario_id": "SCN-107-03",
+          "patient_id": "PT-107-004",
+          "visit_id": "V-M6",
+          "rule_id": "VISIT-003",
+          "deviation_type": "safety_visit_missed_or_late",
+          "narrative": "PT-107-004 (the same patient as SCN-107-01 who started warfarin) missed the Month 6 mandatory safety visit entirely. The patient was hospitalised for an unrelated procedure and could not attend. The visit window was Day 168–196 and no visit occurred within it. VISIT-003 fires: visit status='missed' AND visit_id='V-M6'.",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-107-004' AND visit_id = 'V-M6'",
+            "field": "status",
+            "operation": "SET",
+            "value": "missed",
+            "also_set": {
+              "actual_date": null
+            }
+          },
+          "expected": { "field": "status", "value": "completed", "description": "V-M6 completed within Day 168-196" },
+          "actual":   { "field": "status", "value": "missed", "description": "No visit record within window Day 168-196" },
+          "severity": "major",
+          "rule_engine_check": "visits.visit_id='V-M6' AND (visits.status='missed' OR actual_day NOT BETWEEN 168 AND 196)"
+        },
+
+        {
+          "scenario_id": "SCN-107-04",
+          "patient_id": "PT-107-006",
+          "visit_id": "V-M12",
+          "rule_id": "VISIT-004",
+          "deviation_type": "visit_window_exceeded",
+          "narrative": "PT-107-006 had the Month 12 annual assessment on Day 392 — 13 days outside the allowed window (Day 351-379). The patient had scheduling conflicts and the site failed to reschedule within window. VISIT-004 fires: actual_day(392) > window_latest_day(379).",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-107-006' AND visit_id = 'V-M12'",
+            "field": "actual_date",
+            "operation": "SET",
+            "value": "enrollment_date + 392 days"
+          },
+          "expected": { "field": "actual_day", "description": "Day 351-379 (Day 365 ±14)", "window": [351, 379] },
+          "actual":   { "field": "actual_day", "value": 392, "days_outside_window": 13 },
+          "severity": "minor",
+          "rule_engine_check": "visits.visit_id='V-M12' AND (actual_day < 351 OR actual_day > 379)"
+        },
+
+        {
+          "scenario_id": "SCN-107-05",
+          "patient_id": "PT-107-002",
+          "visit_id": "ALL",
+          "rule_id": "MED-004",
+          "deviation_type": "unapproved_concomitant_medication_change",
+          "narrative": "PT-107-002 had no insulin at baseline (baseline_insulin=false). At Month 6 the GP started insulin glargine 10 units SC QD for worsening glycaemic control. The site coordinator entered the new medication but did not request Medical Monitor approval. MED-004 fires: drug_class='insulin', start_date > enrollment_date, baseline_insulin=false, no approval record.",
+          "mutation": {
+            "table": "medications",
+            "filter": "patient_id = 'PT-107-002'",
+            "operation": "INSERT",
+            "insert_fields": {
+              "drug_name": "insulin glargine",
+              "drug_class": "insulin",
+              "dose": "10 units SC QD",
+              "start_date": "ENROLLMENT_DATE + 185 days",
+              "end_date": null,
+              "indication": "worsening glycaemic control",
+              "reported_by": "GP prescription"
+            },
+            "also_ensure": {
+              "patients.baseline_insulin": false,
+              "medical_monitor_approval": null
+            }
+          },
+          "expected": { "description": "Medical Monitor approval required for new insulin initiation in insulin-naive patient" },
+          "actual":   { "description": "insulin glargine started Day +185 without approval", "drug_name": "insulin glargine" },
+          "severity": "minor",
+          "rule_engine_check": "medications.drug_class='insulin' AND start_date > enrollment_date AND baseline_insulin=false AND approval IS NULL"
+        },
+
+        {
+          "scenario_id": "SCN-107-06",
+          "patient_id": "PT-107-009",
+          "visit_id": "V-M6",
+          "rule_id": "VISIT-003",
+          "deviation_type": "safety_visit_missed_or_late",
+          "narrative": "PT-107-009 attended a Month 6 visit on Day 205 — 9 days outside the upper bound of the allowed window (Day 196). The visit was rescheduled once by the site but still fell outside the protocol window. VISIT-003 fires: actual_day(205) > window_latest_day(196).",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-107-009' AND visit_id = 'V-M6'",
+            "field": "actual_date",
+            "operation": "SET",
+            "value": "enrollment_date + 205 days"
+          },
+          "expected": { "field": "actual_day", "description": "Day 168-196 (Day 182 ±14)", "window": [168, 196] },
+          "actual":   { "field": "actual_day", "value": 205, "days_outside_window": 9 },
+          "severity": "major",
+          "rule_engine_check": "visits.visit_id='V-M6' AND actual_day > 196"
+        }
+
+      ]
+    },
+
+    {
+      "cluster_id": "CLUSTER-110",
+      "site_id": "110",
+      "site_name": "Alpine Clinical, Zurich Switzerland",
+      "risk_intent": "MEDIUM",
+      "cluster_narrative": "Site 110 has visit scheduling problems and laboratory collection failures. The site has a small staff and two patients had their Month 2 and Month 6 visits fall outside their protocol windows (different patients, different reasons). Two patients are missing eGFR measurements at safety-critical visits — a direct threat to the renal composite endpoint. One patient has a very early screening visit that exceeds the 14-day pre-randomisation window. These activate VISIT-001, VISIT-002, VISIT-003, and LAB-003.",
+      "scenarios": [
+
+        {
+          "scenario_id": "SCN-110-01",
+          "patient_id": "PT-110-003",
+          "visit_id": "V-SCREEN",
+          "rule_id": "VISIT-001",
+          "deviation_type": "visit_window_exceeded",
+          "narrative": "PT-110-003 had their screening visit 20 days before the randomisation date — outside the allowed window of 14 days. The screening HbA1c and eGFR are therefore 20 days old at the time of randomisation. VISIT-001 fires and the escalation condition is also checked: 20 days < 30 days, so severity stays minor (not escalated to major).",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-110-003' AND visit_id = 'V-SCREEN'",
+            "field": "actual_date",
+            "operation": "SET",
+            "value": "enrollment_date - 20 days",
+            "note": "enrollment_date = randomisation date (Day 0). Set actual_date of V-SCREEN to Day -20."
+          },
+          "expected": { "description": "Screening Day -14 to Day -1 (window: Day -21 to -1 with 7-day grace)", "window_absolute": [-21, -1] },
+          "actual":   { "description": "Screening on Day -20", "actual_day": -20, "days_outside_nominal_window": 6 },
+          "severity": "minor",
+          "rule_engine_check": "visits.visit_id='V-SCREEN' AND (randomisation_day - actual_day) > 14; escalation: gap > 30 days → major (not triggered here, gap=20)"
+        },
+
+        {
+          "scenario_id": "SCN-110-02",
+          "patient_id": "PT-110-007",
+          "visit_id": "V-M2",
+          "rule_id": "VISIT-002",
+          "deviation_type": "visit_window_exceeded",
+          "narrative": "PT-110-007 attended Month 2 visit on Day 72 — 5 days after the upper bound of the allowed window (Day 67). Staff scheduling at this Swiss site was disrupted by a national holiday. VISIT-002 fires: actual_day(72) > window_latest_day(67).",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-110-007' AND visit_id = 'V-M2'",
+            "field": "actual_date",
+            "operation": "SET",
+            "value": "enrollment_date + 72 days"
+          },
+          "expected": { "field": "actual_day", "description": "Day 53-67 (Day 60 ±7)", "window": [53, 67] },
+          "actual":   { "field": "actual_day", "value": 72, "days_outside_window": 5 },
+          "severity": "minor",
+          "rule_engine_check": "visits.visit_id='V-M2' AND (actual_day < 53 OR actual_day > 67)"
+        },
+
+        {
+          "scenario_id": "SCN-110-03",
+          "patient_id": "PT-110-001",
+          "visit_id": "V-M6",
+          "rule_id": "LAB-003",
+          "deviation_type": "required_endpoint_lab_absent",
+          "narrative": "PT-110-001 attended the Month 6 safety visit but the phlebotomist forgot to collect the serum creatinine sample needed to calculate eGFR. The lab_results table has no row for test_code='eGFR_CKD_EPI' at visit V-M6 for this patient. LAB-003 fires: eGFR absent at safety-critical visit.",
+          "mutation": {
+            "table": "lab_results",
+            "filter": "patient_id = 'PT-110-001' AND visit_id = 'V-M6' AND test_code = 'eGFR_CKD_EPI'",
+            "operation": "DELETE",
+            "note": "Remove (or do not create) the eGFR lab_results row for this patient at V-M6. The visit itself is complete; only the eGFR sample is missing."
+          },
+          "expected": { "description": "eGFR row present at V-M6 with non-null result_value" },
+          "actual":   { "description": "No lab_results row for test_code='eGFR_CKD_EPI' at V-M6", "result_value": null },
+          "severity": "major",
+          "rule_engine_check": "lab_results.test_code='eGFR_CKD_EPI' AND visit_id IN ('V-M6','V-M12','V-EOS') AND result_value IS NULL"
+        },
+
+        {
+          "scenario_id": "SCN-110-04",
+          "patient_id": "PT-110-005",
+          "visit_id": "V-M12",
+          "rule_id": "LAB-003",
+          "deviation_type": "required_endpoint_lab_absent",
+          "narrative": "PT-110-005 had the Month 12 annual assessment visit completed, but the eGFR result was not recorded — the creatinine tube was damaged in transit to the central lab and no re-collection was arranged. lab_results has a row with result_value=NULL for this patient/visit/test. LAB-003 fires: result_value IS NULL at safety-critical visit.",
+          "mutation": {
+            "table": "lab_results",
+            "filter": "patient_id = 'PT-110-005' AND visit_id = 'V-M12' AND test_code = 'eGFR_CKD_EPI'",
+            "field": "result_value",
+            "operation": "SET",
+            "value": null,
+            "note": "Set result_value to NULL, keeping the row present. This simulates a failed lab result that was not re-collected."
+          },
+          "expected": { "field": "result_value", "description": "non-null eGFR value in mL/min/1.73m2" },
+          "actual":   { "field": "result_value", "value": null, "reason": "lab tube damaged in transit" },
+          "severity": "major",
+          "rule_engine_check": "lab_results.test_code='eGFR_CKD_EPI' AND visit_id IN ('V-M6','V-M12','V-EOS') AND result_value IS NULL"
+        },
+
+        {
+          "scenario_id": "SCN-110-05",
+          "patient_id": "PT-110-009",
+          "visit_id": "V-M6",
+          "rule_id": "VISIT-003",
+          "deviation_type": "safety_visit_missed_or_late",
+          "narrative": "PT-110-009 attended Month 6 visit on Day 157 — 11 days before the earliest allowed day (Day 168). The patient was travelling abroad starting Day 170 and asked to come in early. The site accommodated this without checking the protocol window. VISIT-003 fires: actual_day(157) < window_earliest_day(168).",
+          "mutation": {
+            "table": "visits",
+            "filter": "patient_id = 'PT-110-009' AND visit_id = 'V-M6'",
+            "field": "actual_date",
+            "operation": "SET",
+            "value": "enrollment_date + 157 days"
+          },
+          "expected": { "field": "actual_day", "description": "Day 168-196 (Day 182 ±14)", "window": [168, 196] },
+          "actual":   { "field": "actual_day", "value": 157, "days_outside_window": 11 },
+          "severity": "major",
+          "rule_engine_check": "visits.visit_id='V-M6' AND actual_day < 168"
+        }
+
+      ]
+    },
+
+    {
+      "cluster_id": "CLUSTER-105",
+      "site_id": "105",
+      "site_name": "Northgate Medical, Boston MA USA",
+      "risk_intent": "MEDIUM",
+      "cluster_narrative": "Site 105 has two distinct problems. First, one patient was enrolled despite a screening eGFR below the 60 mL/min/1.73 m² eligibility threshold — the site missed the result when reviewing eligibility. Second, the site failed to obtain informed consent before commencing screening procedures for another patient. A third patient's amendment re-consent was severely delayed. These eligibility and consent failures activate LAB-002, PROC-001, and PROC-002 and represent high-seriousness regulatory risk.",
+      "scenarios": [
+
+        {
+          "scenario_id": "SCN-105-01",
+          "patient_id": "PT-105-006",
+          "visit_id": "V-SCREEN",
+          "rule_id": "LAB-002",
+          "deviation_type": "eligibility_lab_out_of_range_or_absent",
+          "narrative": "PT-105-006 had a screening eGFR of 54 mL/min/1.73 m² — below the required ≥ 60 threshold. The site reviewer misread the lab report (54.4 was read as 64.4). The patient was enrolled and randomised. LAB-002 fires: lab_results.result_value(54) < expected(60) at V-SCREEN.",
+          "mutation": {
+            "table": "lab_results",
+            "filter": "patient_id = 'PT-105-006' AND visit_id = 'V-SCREEN' AND test_code = 'eGFR_CKD_EPI'",
+            "field": "result_value",
+            "operation": "SET",
+            "value": 54,
+            "unit": "mL/min/1.73m2"
+          },
+          "expected": { "field": "result_value", "description": "eGFR ≥ 60 mL/min/1.73m2", "threshold": 60 },
+          "actual":   { "field": "result_value", "value": 54, "unit": "mL/min/1.73m2", "below_threshold_by": 6 },
+          "severity": "major",
+          "rule_engine_check": "lab_results.test_code='eGFR_CKD_EPI' AND visit_id='V-SCREEN' AND result_value < 60"
+        },
+
+        {
+          "scenario_id": "SCN-105-02",
+          "patient_id": "PT-105-003",
+          "visit_id": "V-SCREEN",
+          "rule_id": "PROC-001",
+          "deviation_type": "informed_consent_absent_or_late",
+          "narrative": "For PT-105-003, the audit log shows the consent_signed event was recorded 3 days AFTER the first screening blood draw (which collected HbA1c and eGFR samples). This violates ICH E6(R2) 4.8.1: consent must precede all study procedures. PROC-001 fires: audit_logs earliest 'consent_signed' timestamp > earliest visit procedure date.",
+          "mutation": {
+            "table": "audit_logs",
+            "filter": "patient_id = 'PT-105-003' AND action = 'consent_signed'",
+            "field": "performed_at",
+            "operation": "SET",
+            "value": "V-SCREEN actual_date + 3 days",
+            "note": "Move the consent_signed audit log entry to 3 days AFTER the visit actual_date. The visit procedures (labs) were collected at actual_date; consent came later."
+          },
+          "expected": { "description": "consent_signed audit event before or on earliest study procedure date" },
+          "actual":   { "description": "consent_signed 3 days after first blood draw at V-SCREEN" },
+          "severity": "major",
+          "rule_engine_check": "audit_logs action='consent_signed' AND performed_at > MIN(visits.actual_date WHERE patient_id=p)"
+        },
+
+        {
+          "scenario_id": "SCN-105-03",
+          "patient_id": "PT-105-009",
+          "visit_id": "ALL",
+          "rule_id": "PROC-002",
+          "deviation_type": "consent_delay",
+          "narrative": "Protocol Amendment 4 was issued with effective date 2015-06-01. PT-105-009 re-signed the updated ICF 31 days after the effective date (2015-07-02). Between the amendment effective date and the re-consent date, the patient attended the Month 2 visit (Day +58). PROC-002 fires with the major escalation path: re-consent > 30 days AND visit procedures performed without re-consent.",
+          "mutation": {
+            "table": "audit_logs",
+            "filter": "patient_id = 'PT-105-009' AND action = 'amendment_reconsent_signed'",
+            "field": "performed_at",
+            "operation": "SET",
+            "value": "2015-07-02",
+            "note": "Amendment effective_date is 2015-06-01 (from protocol_versions). Set reconsent date to 2015-07-02 = 31 days after amendment. The Month 2 visit occurs within this gap."
+          },
+          "expected": { "description": "Re-consent within 14 calendar days of amendment effective date (by 2015-06-15)", "deadline": "2015-06-15" },
+          "actual":   { "description": "Re-consent on 2015-07-02 = 31 days after amendment", "days_late": 31 },
+          "severity": "major",
+          "severity_path": "PROC-002 base=administrative → escalated to major: re-consent > 30 days AND study procedure performed without re-consent",
+          "rule_engine_check": "amendment_reconsent.reconsent_days_after_amendment > 30 OR study procedure performed after amendment without reconsent"
+        },
+
+        {
+          "scenario_id": "SCN-105-04",
+          "patient_id": "PT-105-007",
+          "visit_id": "V-SCREEN",
+          "rule_id": "LAB-001",
+          "deviation_type": "eligibility_lab_out_of_range_or_absent",
+          "narrative": "PT-105-007 had a screening HbA1c of 12.8% — above the maximum allowed value of 12.0%. The result was available before randomisation but the eligibility reviewer approved enrolment based on a prior HbA1c from 3 months earlier (8.9%). The screening value was filed but not reviewed. LAB-001 fires: lab_results.result_value(12.8) > expected_high(12.0) at V-SCREEN.",
+          "mutation": {
+            "table": "lab_results",
+            "filter": "patient_id = 'PT-105-007' AND visit_id = 'V-SCREEN' AND test_code = 'HBA1C'",
+            "field": "result_value",
+            "operation": "SET",
+            "value": 12.8,
+            "unit": "%"
+          },
+          "expected": { "field": "result_value", "description": "HbA1c 6.5-12.0%", "low": 6.5, "high": 12.0 },
+          "actual":   { "field": "result_value", "value": 12.8, "unit": "%", "above_threshold_by": 0.8 },
+          "severity": "major",
+          "rule_engine_check": "lab_results.test_code='HBA1C' AND visit_id='V-SCREEN' AND result_value > 12.0"
+        }
+
+      ]
+    }
+
+  ],
+
+  "summary": {
+    "total_scenarios": 32,
+    "by_site": {
+      "104": { "count": 9, "rules_violated": ["DOSE-001","DOSE-002","DOSE-003","DOSE-004","DOSE-005","MED-001"], "severities": {"major": 8, "minor": 1} },
+      "102": { "count": 8, "rules_violated": ["PROC-003"], "severities": {"administrative": 6, "minor": 2} },
+      "107": { "count": 6, "rules_violated": ["MED-003","MED-004","VISIT-003","VISIT-004"], "severities": {"major": 4, "minor": 2} },
+      "110": { "count": 5, "rules_violated": ["LAB-003","VISIT-001","VISIT-002","VISIT-003"], "severities": {"major": 3, "minor": 2} },
+      "105": { "count": 4, "rules_violated": ["LAB-001","LAB-002","PROC-001","PROC-002"], "severities": {"major": 4} }
+    },
+    "by_rule": {
+      "DOSE-001": 1, "DOSE-002": 2, "DOSE-003": 3, "DOSE-004": 1, "DOSE-005": 1,
+      "VISIT-001": 1, "VISIT-002": 1, "VISIT-003": 3, "VISIT-004": 1,
+      "MED-001": 1, "MED-003": 2, "MED-004": 1,
+      "LAB-001": 1, "LAB-002": 1, "LAB-003": 2,
+      "PROC-001": 1, "PROC-002": 1, "PROC-003": 8
+    },
+    "by_severity": { "major": 19, "minor": 7, "administrative": 6 },
+    "rules_not_directly_exercised": ["DOSE-002 (base only, no major escalation for site 102)", "MED-002", "VISIT-005", "LAB-003 (at V-EOS not exercised)"],
+    "repeat_violation_pattern": {
+      "site_104_DOSE-003": "SCN-104-01 and SCN-104-03 both violate DOSE-003 (different patients, same rule). Activates RepeatDev component in site risk scoring.",
+      "site_104_DOSE-002": "SCN-104-08 major escalation + SCN-104-09 minor — two compliance failures at same site.",
+      "site_107_MED-003": "SCN-107-01 and SCN-107-02 both violate MED-003 (different patients). Activates RepeatDev and ProhibitedMeds components.",
+      "site_107_VISIT-003": "SCN-107-03 and SCN-107-06 both violate VISIT-003 (different patients). Activates MissedVisits component."
+    }
+  }
+}
