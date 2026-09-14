@@ -168,6 +168,32 @@ export const api = {
     return newRule;
   },
 
+  // GET /api/protocol/rules
+  async getProtocolRules() {
+    await delay(400);
+    return [...protocolRules];
+  },
+
+  // POST /api/protocol/rules/{rule_id}/approve
+  async approveRule(rule_id: string) {
+    await delay(500);
+    const rule = protocolRules.find(r => r.rule_id === rule_id);
+    if (!rule) throw new Error('Rule not found');
+    rule.approval_status = 'APPROVED';
+    createAuditLog('Approved Rule', 'ProtocolRule', rule_id, `Rule ${rule_id} approved`);
+    return rule;
+  },
+
+  // POST /api/protocol/rules/{rule_id}/reject
+  async rejectRule(rule_id: string) {
+    await delay(500);
+    const rule = protocolRules.find(r => r.rule_id === rule_id);
+    if (!rule) throw new Error('Rule not found');
+    rule.approval_status = 'REJECTED';
+    createAuditLog('Rejected Rule', 'ProtocolRule', rule_id, `Rule ${rule_id} rejected`);
+    return rule;
+  },
+
   // POST /api/ai/explain-site
   async explainSite(site_id: string) {
     await delay(1200);
@@ -217,6 +243,12 @@ export const api = {
     capa.status = 'Rejected';
     createAuditLog('Rejected CAPA', 'CAPA', capa_id, 'Human rejected CAPA');
     return capa;
+  },
+
+  // GET /api/capas
+  async getCapas() {
+    await delay(400);
+    return [...capas];
   },
 
   // GET /api/audit-logs

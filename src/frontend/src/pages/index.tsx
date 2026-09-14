@@ -3,8 +3,6 @@ export * from './SiteRanking';
 export * from './SiteDetails';
 export * from './DeviationCenter';
 export * from './PatientTimeline';
-
-// Placeholders for upcoming phases
-export const CAPAManagement = () => <div className="p-8">CAPA Management (Phase 7)</div>;
-export const ProtocolRuleViewer = () => <div className="p-8">Protocol Rule Viewer (Phase 8)</div>;
-export const AuditTrail = () => <div className="p-8">Audit Trail (Phase 9)</div>;
+export * from './CAPAManagement';
+export * from './ProtocolRuleViewer';
+export * from './AuditTrail';
