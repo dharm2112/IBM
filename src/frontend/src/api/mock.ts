@@ -59,6 +59,8 @@ let auditLogs: AuditLog[] = [
 
 export const setMockSites = (newSites: Site[]) => { sites = newSites; };
 export const setMockDeviations = (newDevs: Deviation[]) => { deviations = newDevs; };
+export const setMockCapas = (newCapas: Capa[]) => { capas = newCapas; };
+export const addMockCapa = (newCapa: Capa) => { capas.push(newCapa); };
 
 
 // ==========================================
@@ -200,6 +202,12 @@ export const mockApi = {
     capas.push(newCapa);
     createAuditLog('Generated CAPA Draft', 'CAPA', newCapa.capa_id, `AI generated CAPA for deviation ${deviation_id}`);
     return newCapa;
+  },
+
+  // GET /api/capas
+  async getCapas() {
+    await delay(300);
+    return [...capas];
   },
 
   // POST /api/capa/{capa_id}/approve

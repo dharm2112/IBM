@@ -1,4 +1,4 @@
-import { mockApi, setMockSites, setMockDeviations } from './mock';
+import { mockApi, setMockSites, setMockDeviations, addMockCapa } from './mock';
 import type { Site, Deviation, Capa, ProtocolRule } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
@@ -160,6 +160,8 @@ export const api = {
       requires_human_approval: result.human_review_required
     };
 
+    addMockCapa(newCapa);
+    
     return newCapa;
   },
 
@@ -233,6 +235,10 @@ export const api = {
 
   async getDeviation(deviation_id: string) {
     return mockApi.getDeviation(deviation_id);
+  },
+
+  async getCapas() {
+    return mockApi.getCapas();
   },
 
   async approveCapa(capa_id: string) {
