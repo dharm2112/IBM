@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, "Segoe UI", sans-serif;
+  
+  --color-base-bg: #F7F8FA;
+  --color-base-ink: #111827;
+  --color-base-secondary: #667085;
+  --color-base-muted: #98A2B3;
+  --color-base-border: #E5E7EB;
+  --color-base-card: #FFFFFF;
+
+  --color-risk-low: #10B981; /* Green */
+  --color-risk-medium: #F59E0B; /* Amber */
+  --color-risk-high: #EF4444; /* Red */
+  --color-risk-critical: #991B1B; /* Deep Red */
+  
+  --color-ai-accent: #EEF2FF; /* Subtle blue/purple tinted surface */
+  --color-ai-border: #C7D2FE;
+  --color-ai-text: #4F46E5;
+}
+
+body {
+  background-color: var(--color-base-bg);
+  color: var(--color-base-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
