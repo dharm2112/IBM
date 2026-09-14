@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/mock';
 import type { Capa, Deviation } from '../api/types';
 import { SeverityBadge, AIBanner, ApprovalActions } from '../components';

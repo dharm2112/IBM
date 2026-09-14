@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import { api } from '../api/mock';
 import type { Site } from '../api/types';
 import { DataTable, RiskBadge } from '../components';
 import type { Column } from '../components/DataTable';
@@ -20,7 +20,7 @@ export const SiteRanking = () => {
     try {
       const fetchedSites = await api.getSites();
       // Sort by risk score descending by default
-      setSites(fetchedSites.sort((a, b) => b.risk_score - a.risk_score));
+      setSites(fetchedSites.sort((a: Site, b: Site) => b.risk_score - a.risk_score));
     } catch (error) {
       console.error("Failed to fetch sites", error);
     } finally {

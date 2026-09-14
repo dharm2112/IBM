@@ -57,19 +57,12 @@ let auditLogs: AuditLog[] = [
   { audit_id: 'AL-003', timestamp: '2023-02-06T10:00:00Z', actor: 'watsonx.ai', action: 'Generated CAPA Draft', entity_type: 'CAPA', entity_id: 'CAPA-001', details: 'AI generated draft CAPA for DEV-002' },
 ];
 
-export const setMockSites = (newSites: Site[]) => { sites = newSites; };
-export const setMockDeviations = (newDevs: Deviation[]) => { deviations = newDevs; };
-export const setMockCapas = (newCapas: Capa[]) => { capas = newCapas; };
-export const addMockCapa = (newCapa: Capa) => { capas.push(newCapa); };
-export const addMockProtocolRules = (newRules: ProtocolRule[]) => { protocolRules.push(...newRules); };
-
-
 // ==========================================
 // UTILS
 // ==========================================
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const createAuditLog = (action: string, entity_type: string, entity_id: string, details: string, previous_status?: string, new_status?: string, source?: string) => {
+const createAuditLog = (action: string, entity_type: string, entity_id: string, details: string) => {
   auditLogs.unshift({
     audit_id: `AL-${Math.floor(Math.random() * 10000)}`,
     timestamp: new Date().toISOString(),
@@ -78,9 +71,6 @@ const createAuditLog = (action: string, entity_type: string, entity_id: string, 
     entity_type,
     entity_id,
     details,
-    previous_status,
-    new_status,
-    source: source || 'System',
   });
 };
 
@@ -88,7 +78,7 @@ const createAuditLog = (action: string, entity_type: string, entity_id: string, 
 // API CLIENT FUNCTIONS
 // ==========================================
 
-export const mockApi = {
+export const api = {
   // GET /api/health
   async getHealth() {
     await delay(200);
@@ -173,8 +163,34 @@ export const mockApi = {
       approval_status: 'PENDING'
     };
     protocolRules.push(newRule);
-    createAuditLog('Extracted Protocol Rule', 'ProtocolRule', newRule.rule_id, `AI extracted rule from ${file.name}`, undefined, 'PENDING', 'watsonx.ai');
+    createAuditLog('Extracted Protocol Rule', 'ProtocolRule', newRule.rule_id, `AI extracted rule from ${file.name}`);
     return newRule;
+  },
+
+  // GET /api/protocol/rules
+  async getProtocolRules() {
+    await delay(400);
+    return [...protocolRules];
+  },
+
+  // POST /api/protocol/rules/{rule_id}/approve
+  async approveRule(rule_id: string) {
+    await delay(500);
+    const rule = protocolRules.find(r => r.rule_id === rule_id);
+    if (!rule) throw new Error('Rule not found');
+    rule.approval_status = 'APPROVED';
+    createAuditLog('Approved Rule', 'ProtocolRule', rule_id, `Rule ${rule_id} approved`);
+    return rule;
+  },
+
+  // POST /api/protocol/rules/{rule_id}/reject
+  async rejectRule(rule_id: string) {
+    await delay(500);
+    const rule = protocolRules.find(r => r.rule_id === rule_id);
+    if (!rule) throw new Error('Rule not found');
+    rule.approval_status = 'REJECTED';
+    createAuditLog('Rejected Rule', 'ProtocolRule', rule_id, `Rule ${rule_id} rejected`);
+    return rule;
   },
 
   // POST /api/ai/explain-site
@@ -204,42 +220,8 @@ export const mockApi = {
       requires_human_approval: true
     };
     capas.push(newCapa);
-    createAuditLog('Generated CAPA Draft', 'CAPA', newCapa.capa_id, `AI generated CAPA for deviation ${deviation_id}`, undefined, 'Draft', 'watsonx.ai');
+    createAuditLog('Generated CAPA Draft', 'CAPA', newCapa.capa_id, `AI generated CAPA for deviation ${deviation_id}`);
     return newCapa;
-  },
-
-  // GET /api/capas
-  async getCapas() {
-    await delay(300);
-    return [...capas];
-  },
-
-  // GET /api/protocol-rules
-  async getProtocolRules() {
-    await delay(300);
-    return [...protocolRules];
-  },
-
-  // POST /api/protocol-rules/{rule_id}/approve
-  async approveProtocolRule(rule_id: string) {
-    await delay(500);
-    const rule = protocolRules.find(r => r.rule_id === rule_id);
-    if (!rule) throw new Error('Rule not found');
-    const oldStatus = rule.approval_status;
-    rule.approval_status = 'APPROVED';
-    createAuditLog('Approved Protocol Rule', 'ProtocolRule', rule_id, 'Human approved extracted rule', oldStatus, 'APPROVED', 'User Review');
-    return rule;
-  },
-
-  // POST /api/protocol-rules/{rule_id}/reject
-  async rejectProtocolRule(rule_id: string) {
-    await delay(500);
-    const rule = protocolRules.find(r => r.rule_id === rule_id);
-    if (!rule) throw new Error('Rule not found');
-    const oldStatus = rule.approval_status;
-    rule.approval_status = 'REJECTED';
-    createAuditLog('Rejected Protocol Rule', 'ProtocolRule', rule_id, 'Human rejected extracted rule', oldStatus, 'REJECTED', 'User Review');
-    return rule;
   },
 
   // POST /api/capa/{capa_id}/approve
@@ -247,9 +229,8 @@ export const mockApi = {
     await delay(600);
     const capa = capas.find(c => c.capa_id === capa_id);
     if (!capa) throw new Error('CAPA not found');
-    const oldStatus = capa.status;
     capa.status = 'Approved';
-    createAuditLog('Approved CAPA', 'CAPA', capa_id, 'Human approved CAPA', oldStatus, 'Approved', 'User Review');
+    createAuditLog('Approved CAPA', 'CAPA', capa_id, 'Human approved CAPA');
     return capa;
   },
 
@@ -258,10 +239,15 @@ export const mockApi = {
     await delay(600);
     const capa = capas.find(c => c.capa_id === capa_id);
     if (!capa) throw new Error('CAPA not found');
-    const oldStatus = capa.status;
     capa.status = 'Rejected';
-    createAuditLog('Rejected CAPA', 'CAPA', capa_id, 'Human rejected CAPA', oldStatus, 'Rejected', 'User Review');
+    createAuditLog('Rejected CAPA', 'CAPA', capa_id, 'Human rejected CAPA');
     return capa;
+  },
+
+  // GET /api/capas
+  async getCapas() {
+    await delay(400);
+    return [...capas];
   },
 
   // GET /api/audit-logs
@@ -270,4 +256,11 @@ export const mockApi = {
     return [...auditLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 };
+
+export const mockApi = api;
+export const setMockSites = (newSites: Site[]) => { sites = newSites; };
+export const setMockDeviations = (newDevs: Deviation[]) => { deviations = newDevs; };
+export const addMockCapa = (newCapa: Capa) => { capas.push(newCapa); };
+export const addMockProtocolRules = (newRules: ProtocolRule[]) => { protocolRules.push(...newRules); };
+
 

@@ -3,8 +3,6 @@ export * from './SiteRanking';
 export * from './SiteDetails';
 export * from './DeviationCenter';
 export * from './PatientTimeline';
-export * from './CapaManagement';
+export * from './CAPAManagement';
 export * from './ProtocolRuleViewer';
 export * from './AuditTrail';
-
-// Placeholders for upcoming phases
