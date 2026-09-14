@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/mock';
 import type { ProtocolRule } from '../api/types';
-import { SeverityBadge, AIBanner, ApprovalActions, DetailDrawer } from '../components';
-import { Upload, Search, FileText, CheckCircle, Clock, Loader2, Sparkles } from 'lucide-react';
+import { SeverityBadge, AIBanner, ApprovalActions, DetailDrawer, Folder } from '../components';
+import { Upload, Search, CheckCircle, Clock, Loader2, Sparkles } from 'lucide-react';
 
 // ─── Rule Card ────────────────────────────────────────────────────────────────
 const RuleCard: React.FC<{ rule: ProtocolRule; onClick: () => void }> = ({ rule, onClick }) => {
@@ -20,7 +20,7 @@ const RuleCard: React.FC<{ rule: ProtocolRule; onClick: () => void }> = ({ rule,
       <div className="flex items-start justify-between mb-3">
         <span className="font-mono text-xs text-base-muted">{rule.rule_id}</span>
         <div className="flex items-center space-x-2">
-          <SeverityBadge level={rule.severity} />
+          <SeverityBadge level={rule.severity || 'MINOR'} />
           <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${statusStyles[rule.approval_status]}`}>
             {rule.approval_status === 'APPROVED' ? (
               <span className="flex items-center gap-1"><CheckCircle size={10} /> Approved</span>
@@ -74,21 +74,23 @@ const UploadPanel: React.FC<{ onUpload: (file: File) => Promise<void> }> = ({ on
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all ${
-          isDragging ? 'border-base-ink bg-white/60' : 'border-ai-border bg-white/30 hover:bg-white/50'
+        className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all flex flex-col items-center justify-center ${
+          isDragging ? 'border-base-ink bg-white/70 shadow-inner' : 'border-ai-border bg-white/40 hover:bg-white/60'
         }`}
       >
         {isUploading ? (
-          <div className="flex flex-col items-center space-y-3">
-            <Loader2 size={28} className="text-ai-text animate-spin" />
+          <div className="flex flex-col items-center space-y-3 py-4">
+            <Loader2 size={32} className="text-ai-text animate-spin" />
             <p className="text-sm font-medium text-base-ink animate-pulse">watsonx.ai is extracting protocol rules...</p>
           </div>
         ) : (
-          <>
-            <FileText size={28} className="mx-auto mb-3 text-ai-text" />
+          <div className="flex flex-col items-center">
+            <div className="mb-2 h-44 flex items-center justify-center">
+              <Folder size="sm" color="black" open={isDragging} />
+            </div>
             <p className="text-sm font-medium text-base-ink mb-1">Drop your protocol PDF here</p>
             <p className="text-xs text-base-muted mb-4">or click to browse</p>
-            <label className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2 bg-base-ink text-white text-sm font-medium rounded-md hover:bg-black transition-colors">
+            <label className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2 bg-base-ink text-white text-sm font-medium rounded-md hover:bg-black transition-all shadow-sm hover:shadow">
               <Upload size={14} />
               <span>Browse File</span>
               <input
@@ -99,11 +101,11 @@ const UploadPanel: React.FC<{ onUpload: (file: File) => Promise<void> }> = ({ on
               />
             </label>
             {lastUploaded && (
-              <p className="mt-4 text-xs text-risk-low flex items-center justify-center gap-1">
+              <p className="mt-4 text-xs text-risk-low flex items-center justify-center gap-1 bg-green-50 px-3 py-1.5 rounded-md border border-green-200">
                 <CheckCircle size={12} /> Rule extracted from <strong>{lastUploaded}</strong> — review below
               </p>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -121,7 +123,7 @@ const RuleDetail: React.FC<{
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
-        <SeverityBadge level={rule.severity} />
+        <SeverityBadge level={rule.severity || 'MINOR'} />
         <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded border border-slate-200">{rule.category}</span>
         <span className="text-xs text-base-muted">{rule.protocol_reference}</span>
       </div>
@@ -217,9 +219,9 @@ export const ProtocolRuleViewer = () => {
   const categories = ['All', ...Array.from(new Set(rules.map((r) => r.category)))];
 
   const filtered = rules.filter((r) => {
-    const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) ||
-                          r.rule_id.toLowerCase().includes(search.toLowerCase()) ||
-                          r.description.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = (r.name || '').toLowerCase().includes(search.toLowerCase()) ||
+                          (r.rule_id || '').toLowerCase().includes(search.toLowerCase()) ||
+                          (r.description || '').toLowerCase().includes(search.toLowerCase());
     const matchesCat = categoryFilter === 'All' || r.category === categoryFilter;
     const matchesStatus = statusFilter === 'All' || r.approval_status === statusFilter;
     return matchesSearch && matchesCat && matchesStatus;

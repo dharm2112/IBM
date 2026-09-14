@@ -257,3 +257,10 @@ export const api = {
   }
 };
 
+export const mockApi = api;
+export const setMockSites = (newSites: Site[]) => { sites = newSites; };
+export const setMockDeviations = (newDevs: Deviation[]) => { deviations = newDevs; };
+export const addMockCapa = (newCapa: Capa) => { capas.push(newCapa); };
+export const addMockProtocolRules = (newRules: ProtocolRule[]) => { protocolRules.push(...newRules); };
+
+

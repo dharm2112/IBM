@@ -257,11 +257,11 @@ export const api = {
   },
 
   async approveProtocolRule(rule_id: string) {
-    return mockApi.approveProtocolRule(rule_id);
+    return mockApi.approveRule(rule_id);
   },
 
   async rejectProtocolRule(rule_id: string) {
-    return mockApi.rejectProtocolRule(rule_id);
+    return mockApi.rejectRule(rule_id);
   },
 
   async approveCapa(capa_id: string) {

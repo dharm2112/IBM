@@ -8,3 +8,5 @@ export * from './Timeline';
 export * from './ApprovalActions';
 export * from './DetailDrawer';
 export { default as Layout } from './Layout';
+export * from './FolderComponent';
+
