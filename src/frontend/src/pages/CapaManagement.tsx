@@ -1,339 +1,293 @@
-import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../api/mock';
 import type { Capa, Deviation } from '../api/types';
-import type { Column } from '../components/DataTable';
-import { DataTable, SeverityBadge, DetailDrawer, AIBanner } from '../components';
-import { FileText, Loader2, Plus, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { SeverityBadge, AIBanner, ApprovalActions } from '../components';
+import { Sparkles, Loader2, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 
+// ─── Kanban Column ────────────────────────────────────────────────────────────
+const STAGES: Capa['status'][] = ['Draft', 'Pending Review', 'Approved', 'Rejected', 'Closed'];
+
+const stageColor: Record<string, string> = {
+  'Draft':          'bg-slate-100 text-slate-600 border-slate-200',
+  'Pending Review': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Approved':       'bg-green-50 text-green-700 border-green-200',
+  'Rejected':       'bg-red-50 text-red-700 border-red-200',
+  'Closed':         'bg-slate-50 text-slate-500 border-slate-200',
+};
+
+interface CapaCardProps {
+  capa: Capa;
+  deviation?: Deviation;
+  onSelect: (capa: Capa) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+}
+
+const CapaCard: React.FC<CapaCardProps> = ({ capa, deviation, onSelect, onApprove, onReject }) => (
+  <div
+    className="bg-white border border-base-border rounded-lg p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group"
+    onClick={() => onSelect(capa)}
+  >
+    <div className="flex items-start justify-between mb-3">
+      <span className="font-mono text-xs text-base-muted">{capa.capa_id}</span>
+      {capa.ai_generated && (
+        <span className="flex items-center space-x-1 text-xs font-medium text-ai-text bg-ai-accent px-2 py-0.5 rounded-full border border-ai-border">
+          <Sparkles size={10} />
+          <span>AI</span>
+        </span>
+      )}
+    </div>
+
+    <h4 className="text-sm font-semibold text-base-ink mb-1 leading-snug group-hover:text-black">{capa.title}</h4>
+    <p className="text-xs text-base-secondary mb-3 line-clamp-2">{capa.root_cause_hypothesis}</p>
+
+    {deviation && (
+      <div className="flex items-center space-x-2 mb-3">
+        <span className="font-mono text-xs text-base-muted">{capa.deviation_id}</span>
+        <SeverityBadge level={deviation.severity} />
+      </div>
+    )}
+
+    <div className="text-xs text-base-muted mb-3">
+      Owner: <span className="font-medium text-base-ink">{capa.owner_role}</span>
+    </div>
+
+    {capa.requires_human_approval && capa.status === 'Pending Review' && (
+      <div className="pt-3 border-t border-base-border" onClick={(e) => e.stopPropagation()}>
+        <ApprovalActions
+          onApprove={async () => onApprove(capa.capa_id)}
+          onReject={async () => onReject(capa.capa_id)}
+          status={capa.status}
+        />
+      </div>
+    )}
+  </div>
+);
+
+// ─── CAPA Detail Panel ────────────────────────────────────────────────────────
+const CapaDetail: React.FC<{ capa: Capa; onClose: () => void }> = ({ capa, onClose }) => {
+  const sections: { label: string; value: string }[] = [
+    { label: 'Root Cause Hypothesis', value: capa.root_cause_hypothesis },
+    { label: 'Immediate Action',       value: capa.immediate_action },
+    { label: 'Corrective Action',      value: capa.corrective_action },
+    { label: 'Preventive Action',      value: capa.preventive_action },
+    { label: 'Verification Method',    value: capa.verification_method },
+  ];
+
+  return (
+    <div className="fixed inset-y-0 right-0 w-full max-w-xl bg-base-card shadow-2xl z-50 flex flex-col border-l border-base-border animate-in slide-in-from-right duration-300">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-base-border bg-slate-50/50">
+        <div>
+          <span className="font-mono text-xs text-base-muted block mb-1">{capa.capa_id}</span>
+          <h2 className="text-lg font-semibold text-base-ink">{capa.title}</h2>
+        </div>
+        <div className="flex items-center space-x-3">
+          <span className={`text-xs font-semibold px-2 py-1 rounded border ${stageColor[capa.status]}`}>{capa.status}</span>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-base-secondary hover:text-base-ink">✕</button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
+            <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Deviation</span>
+            <span className="font-mono text-sm font-medium">{capa.deviation_id}</span>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
+            <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Owner</span>
+            <span className="font-medium text-sm">{capa.owner_role}</span>
+          </div>
+        </div>
+
+        {capa.ai_generated && (
+          <AIBanner>
+            <p className="text-sm text-base-ink">This CAPA was generated by <strong>IBM watsonx.ai</strong> based on deviation evidence, clinical context, and historical CAPA outcomes from similar trials. It requires human review before approval.</p>
+          </AIBanner>
+        )}
+
+        {sections.map((s) => (
+          <div key={s.label}>
+            <h3 className="text-xs font-semibold text-base-muted uppercase tracking-wider mb-2">{s.label}</h3>
+            <p className="text-sm text-base-ink leading-relaxed bg-slate-50 p-4 rounded-lg border border-base-border">{s.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── AI Generator Panel ───────────────────────────────────────────────────────
+const AIGeneratorPanel: React.FC<{ deviations: Deviation[]; onGenerate: (devId: string) => Promise<void> }> = ({ deviations, onGenerate }) => {
+  const [selectedDev, setSelectedDev] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!selectedDev) return;
+    setIsGenerating(true);
+    await onGenerate(selectedDev);
+    setIsGenerating(false);
+    setExpanded(false);
+    setSelectedDev('');
+  };
+
+  return (
+    <div className="bg-ai-accent border border-ai-border rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/30 transition-colors"
+      >
+        <div className="flex items-center space-x-3">
+          <Sparkles size={16} className="text-ai-text" />
+          <span className="font-semibold text-base-ink">Generate CAPA with IBM watsonx.ai</span>
+        </div>
+        {expanded ? <ChevronDown size={18} className="text-base-secondary" /> : <ChevronRight size={18} className="text-base-secondary" />}
+      </button>
+
+      {expanded && (
+        <div className="px-5 pb-5 space-y-4 border-t border-ai-border bg-white/20">
+          <p className="text-sm text-base-secondary pt-4">Select a deviation to generate an AI-powered CAPA draft.</p>
+          <select
+            value={selectedDev}
+            onChange={(e) => setSelectedDev(e.target.value)}
+            className="w-full text-sm border border-base-border rounded-md bg-white py-2 px-3 focus:outline-none focus:ring-2 focus:ring-base-ink/20"
+          >
+            <option value="">Select a deviation...</option>
+            {deviations.map((d) => (
+              <option key={d.deviation_id} value={d.deviation_id}>
+                {d.deviation_id} — {d.description.substring(0, 50)}...
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleGenerate}
+            disabled={!selectedDev || isGenerating}
+            className="w-full py-2.5 bg-base-ink hover:bg-black text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Generating CAPA draft...</span>
+              </>
+            ) : (
+              <>
+                <Plus size={16} />
+                <span>Generate CAPA</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export const CAPAManagement = () => {
   const [capas, setCapas] = useState<Capa[]>([]);
   const [deviations, setDeviations] = useState<Deviation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Detail Drawer state
   const [selectedCapa, setSelectedCapa] = useState<Capa | null>(null);
-
-  // Generate CAPA modal state
-  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
-  const [selectedDeviationId, setSelectedDeviationId] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      const [fetchedCapas, fetchedDeviations] = await Promise.all([
-        api.getCapas(),
-        api.getDeviations()
-      ]);
-      setCapas(fetchedCapas);
-      setDeviations(fetchedDeviations);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load CAPA data.');
+      const [c, d] = await Promise.all([api.getCapas(), api.getDeviations()]);
+      setCapas(c);
+      setDeviations(d);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  const handleGenerateCapa = async () => {
-    if (!selectedDeviationId) return;
-    
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const newCapa = await api.generateCapa(selectedDeviationId);
-      setCapas(prev => [...prev, newCapa]);
-      setIsGenerateModalOpen(false);
-      setSelectedDeviationId('');
-      setSelectedCapa(newCapa);
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate CAPA. Watsonx may be unavailable.');
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleApprove = async (capaId: string) => {
+    await api.approveCapa(capaId);
+    await fetchData();
   };
 
-  const handleApprove = async (capa_id: string) => {
-    try {
-      await api.approveCapa(capa_id);
-      setCapas(prev => prev.map(c => c.capa_id === capa_id ? { ...c, status: 'Approved' } : c));
-      if (selectedCapa && selectedCapa.capa_id === capa_id) {
-        setSelectedCapa({ ...selectedCapa, status: 'Approved' });
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to approve CAPA.');
-    }
+  const handleReject = async (capaId: string) => {
+    await api.rejectCapa(capaId);
+    await fetchData();
   };
 
-  const handleReject = async (capa_id: string) => {
-    try {
-      await api.rejectCapa(capa_id);
-      setCapas(prev => prev.map(c => c.capa_id === capa_id ? { ...c, status: 'Rejected' } : c));
-      if (selectedCapa && selectedCapa.capa_id === capa_id) {
-        setSelectedCapa({ ...selectedCapa, status: 'Rejected' });
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to reject CAPA.');
-    }
+  const handleGenerate = async (deviationId: string) => {
+    await api.generateCapa(deviationId);
+    await fetchData();
   };
 
-  // Find deviation for a specific CAPA
-  const getDeviationForCapa = (capa: Capa) => {
-    return deviations.find(d => d.deviation_id === capa.deviation_id);
-  };
+  const getDeviation = (devId: string) => deviations.find((d) => d.deviation_id === devId);
 
-  const columns: Column<Capa>[] = [
-    { key: 'id', header: 'CAPA ID', render: (c: Capa) => <span className="font-mono text-sm">{c.capa_id}</span> },
-    { key: 'deviation', header: 'Deviation', render: (c: Capa) => {
-        const dev = getDeviationForCapa(c);
-        return dev ? (
-          <div>
-            <div className="font-mono text-xs">{dev.deviation_id}</div>
-            <div className="text-xs text-base-secondary truncate max-w-[150px]">{dev.category}</div>
-          </div>
-        ) : <span className="text-base-muted text-xs">Unknown</span>;
-    }},
-    { key: 'site', header: 'Site', render: (c: Capa) => {
-        const dev = getDeviationForCapa(c);
-        return dev ? <span className="text-sm">{dev.site_id}</span> : '-';
-    }},
-    { key: 'severity', header: 'Severity', render: (c: Capa) => {
-        const dev = getDeviationForCapa(c);
-        return dev ? <SeverityBadge level={dev.severity} /> : <span />;
-    }},
-    { key: 'title', header: 'Title', render: (c: Capa) => (
-      <div className="truncate max-w-[200px] text-sm" title={c.title}>
-        {c.ai_generated && <span className="mr-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">AI Draft</span>}
-        {c.title}
-      </div>
-    )},
-    { key: 'status', header: 'Status', render: (c: Capa) => (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-        c.status === 'Approved' ? 'bg-green-100 text-green-800' :
-        c.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-        c.status === 'Pending Review' || c.status === 'Draft' ? 'bg-amber-100 text-amber-800' :
-        'bg-slate-100 text-slate-800'
-      }`}>
-        {c.status}
-      </span>
-    )},
-  ];
-
-  // Deviations available for new CAPAs (those that don't already have one attached)
-  const availableDeviations = deviations.filter(d => !capas.find(c => c.deviation_id === d.deviation_id));
+  if (isLoading && capas.length === 0) {
+    return <div className="flex items-center justify-center h-64 text-base-secondary">Loading CAPA data...</div>;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-base-ink">CAPA Management</h1>
-          <p className="text-sm text-base-secondary mt-2">Generate and review Corrective and Preventive Actions.</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <button 
-            onClick={() => setIsGenerateModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-base-ink hover:bg-black rounded-md transition-colors"
-          >
-            <Plus size={16} />
-            <span>New CAPA</span>
-          </button>
-        </div>
+      {/* Header */}
+      <div className="border-b border-base-border pb-6">
+        <h1 className="text-3xl font-semibold text-base-ink">CAPA Management</h1>
+        <p className="text-sm text-base-secondary mt-2">
+          Corrective and Preventive Actions generated by IBM watsonx.ai and reviewed by clinical staff.
+        </p>
       </div>
 
-      <AIBanner>
-        <div className="space-y-1">
-          <h3 className="font-semibold text-sm text-ai-text">AI-Assisted CAPA Generation</h3>
-          <p className="text-sm text-ai-text/80">
-            Watsonx.ai drafts Corrective and Preventive Actions based on deterministic deviation data. AI does not determine severity. All AI drafts require human review and approval.
-          </p>
-        </div>
-      </AIBanner>
-
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center space-x-3">
-          <AlertTriangle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64 text-base-secondary">Loading CAPA records...</div>
-      ) : (
-        <DataTable 
-          data={capas} 
-          columns={columns} 
-          keyField="capa_id"
-          onRowClick={(c: Capa) => setSelectedCapa(c)}
-        />
-      )}
-
-      {/* Generate CAPA Modal */}
-      {isGenerateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-base-border flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-base-ink">Generate CAPA with Watsonx</h2>
-              <button 
-                onClick={() => setIsGenerateModalOpen(false)}
-                className="text-base-muted hover:text-base-ink transition-colors"
-              >
-                <XCircle size={20} />
-              </button>
-            </div>
-            
-            <div className="p-6 flex-1 overflow-y-auto">
-              <p className="text-sm text-base-secondary mb-4">
-                Select a deviation to generate a draft CAPA. The AI will analyze the deviation details, expected protocol, and severity (determined by the rules engine) to propose root causes and corrective actions.
-              </p>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-base-ink block">Select Deviation</label>
-                <select 
-                  className="w-full border border-base-border rounded-md p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-base-ink/20"
-                  value={selectedDeviationId}
-                  onChange={(e) => setSelectedDeviationId(e.target.value)}
-                >
-                  <option value="">-- Choose a deviation --</option>
-                  {availableDeviations.map(d => (
-                    <option key={d.deviation_id} value={d.deviation_id}>
-                      {d.deviation_id} - {d.category} (Site: {d.site_id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 border-t border-base-border bg-slate-50 rounded-b-xl flex justify-end space-x-3">
-              <button 
-                onClick={() => setIsGenerateModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-base-ink bg-white border border-base-border rounded-md hover:bg-slate-50 transition-colors"
-                disabled={isGenerating}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleGenerateCapa}
-                disabled={!selectedDeviationId || isGenerating}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-base-ink hover:bg-black rounded-md transition-colors disabled:opacity-50"
-              >
-                {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-                <span>{isGenerating ? 'Generating...' : 'Generate CAPA'}</span>
-              </button>
-            </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {STAGES.map((stage) => (
+          <div key={stage} className="bg-base-card border border-base-border rounded-lg p-4">
+            <span className="text-xs text-base-muted block mb-2">{stage}</span>
+            <span className="text-2xl font-semibold text-base-ink">
+              {capas.filter((c) => c.status === stage).length}
+            </span>
           </div>
-        </div>
+        ))}
+      </div>
+
+      {/* AI Generator */}
+      <AIGeneratorPanel deviations={deviations} onGenerate={handleGenerate} />
+
+      {/* Kanban Board */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto">
+        {STAGES.map((stage) => {
+          const stageCaps = capas.filter((c) => c.status === stage);
+          return (
+            <div key={stage} className="flex flex-col min-w-[220px]">
+              <div className={`flex items-center justify-between px-3 py-2 rounded-lg border mb-3 ${stageColor[stage]}`}>
+                <span className="text-xs font-semibold uppercase tracking-wider">{stage}</span>
+                <span className="text-xs font-bold tabular-nums">{stageCaps.length}</span>
+              </div>
+              <div className="space-y-3 flex-1">
+                {stageCaps.length === 0 && (
+                  <div className="border-2 border-dashed border-base-border rounded-lg p-4 text-center text-xs text-base-muted">
+                    No CAPAs
+                  </div>
+                )}
+                {stageCaps.map((capa) => (
+                  <CapaCard
+                    key={capa.capa_id}
+                    capa={capa}
+                    deviation={getDeviation(capa.deviation_id)}
+                    onSelect={setSelectedCapa}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Detail Side Panel */}
+      {selectedCapa && (
+        <>
+          <div className="fixed inset-0 bg-base-ink/20 backdrop-blur-sm z-40" onClick={() => setSelectedCapa(null)} />
+          <CapaDetail capa={selectedCapa} onClose={() => setSelectedCapa(null)} />
+        </>
       )}
-
-      {/* CAPA Detail Drawer */}
-      <DetailDrawer 
-        isOpen={!!selectedCapa} 
-        onClose={() => setSelectedCapa(null)}
-        title={
-          <div className="flex items-center space-x-3">
-            <span className="font-mono text-sm">{selectedCapa?.capa_id}</span>
-            {selectedCapa?.status === 'Draft' && (
-              <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded font-medium border border-amber-200">
-                Draft - Review Required
-              </span>
-            )}
-            {selectedCapa?.status === 'Approved' && (
-              <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-medium border border-green-200 flex items-center space-x-1">
-                <CheckCircle size={12} />
-                <span>Approved</span>
-              </span>
-            )}
-          </div>
-        }
-      >
-        {selectedCapa && (
-          <div className="space-y-6">
-            {selectedCapa.ai_generated && (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 flex items-start space-x-3">
-                <FileText className="text-purple-600 mt-0.5 flex-shrink-0" size={18} />
-                <div>
-                  <h4 className="text-sm font-medium text-purple-900">AI-Generated Draft</h4>
-                  <p className="text-xs text-purple-700 mt-1">
-                    This CAPA was generated by Watsonx.ai based on deterministic severity. Human approval is required before it can be closed.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <h3 className="text-xl font-semibold text-base-ink mb-2">{selectedCapa.title}</h3>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-                  <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Status</span>
-                  <span className="font-medium text-sm">{selectedCapa.status}</span>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-                  <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Owner Role</span>
-                  <span className="font-medium text-sm">{selectedCapa.owner_role}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-base-border pt-6">
-              <h3 className="text-sm font-semibold text-base-muted uppercase tracking-wider mb-4">Investigation & Plan</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-base-ink mb-1">Root Cause Hypothesis</h4>
-                  <p className="text-sm text-base-secondary bg-slate-50 p-3 rounded border border-base-border/50">
-                    {selectedCapa.root_cause_hypothesis}
-                  </p>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium text-base-ink mb-1">Immediate Corrective Action</h4>
-                  <p className="text-sm text-base-secondary bg-slate-50 p-3 rounded border border-base-border/50">
-                    {selectedCapa.immediate_action}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-medium text-base-ink mb-1">Preventive Action</h4>
-                  <p className="text-sm text-base-secondary bg-slate-50 p-3 rounded border border-base-border/50">
-                    {selectedCapa.preventive_action}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-medium text-base-ink mb-1">Effectiveness Check</h4>
-                  <p className="text-sm text-base-secondary bg-slate-50 p-3 rounded border border-base-border/50">
-                    {selectedCapa.verification_method}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {selectedCapa.requires_human_approval && (selectedCapa.status === 'Draft' || selectedCapa.status === 'Pending Review') && (
-              <div className="border-t border-base-border pt-6 mt-6">
-                <h3 className="text-sm font-semibold text-base-muted uppercase tracking-wider mb-3">Human Review</h3>
-                <div className="flex space-x-3">
-                  <button 
-                    onClick={() => handleApprove(selectedCapa.capa_id)}
-                    className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors"
-                  >
-                    Approve CAPA
-                  </button>
-                  <button 
-                    onClick={() => handleReject(selectedCapa.capa_id)}
-                    className="flex-1 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium rounded-md transition-colors"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </DetailDrawer>
     </div>
   );
 };
