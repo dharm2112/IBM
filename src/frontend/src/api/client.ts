@@ -216,11 +216,11 @@ export const api = {
   // ---------------------------------------------------------
 
   async getSites() {
-    return mockApi.getSites();
+    return await fetchWithHandler('/sites');
   },
 
   async getSite(site_id: string) {
-    return mockApi.getSite(site_id);
+    return await fetchWithHandler(`/sites/${site_id}`);
   },
 
   async getPatient(patient_id: string) {
@@ -236,11 +236,16 @@ export const api = {
   },
 
   async getDeviations(filters?: { site_id?: string; patient_id?: string; severity?: string }) {
-    return mockApi.getDeviations(filters);
+    const params = new URLSearchParams();
+    if (filters?.site_id) params.append('site_id', filters.site_id);
+    if (filters?.patient_id) params.append('patient_id', filters.patient_id);
+    if (filters?.severity) params.append('severity', filters.severity);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return await fetchWithHandler(`/deviations${qs}`);
   },
 
   async getDeviation(deviation_id: string) {
-    return mockApi.getDeviation(deviation_id);
+    return await fetchWithHandler(`/deviations/${deviation_id}`);
   },
 
   async getCapas() {
