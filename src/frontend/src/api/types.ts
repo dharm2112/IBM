@@ -93,4 +93,7 @@ export interface AuditLog {
   entity_type: string;
   entity_id: string;
   details: string;
+  previous_status?: string;
+  new_status?: string;
+  source?: string;
 }

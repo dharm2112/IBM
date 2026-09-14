@@ -69,7 +69,7 @@ export const addMockProtocolRules = (newRules: ProtocolRule[]) => { protocolRule
 // ==========================================
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const createAuditLog = (action: string, entity_type: string, entity_id: string, details: string) => {
+const createAuditLog = (action: string, entity_type: string, entity_id: string, details: string, previous_status?: string, new_status?: string, source?: string) => {
   auditLogs.unshift({
     audit_id: `AL-${Math.floor(Math.random() * 10000)}`,
     timestamp: new Date().toISOString(),
@@ -77,7 +77,10 @@ const createAuditLog = (action: string, entity_type: string, entity_id: string, 
     action,
     entity_type,
     entity_id,
-    details
+    details,
+    previous_status,
+    new_status,
+    source: source || 'System',
   });
 };
 
@@ -170,7 +173,7 @@ export const mockApi = {
       approval_status: 'PENDING'
     };
     protocolRules.push(newRule);
-    createAuditLog('Uploaded Protocol', 'ProtocolRule', newRule.rule_id, `Extracted rule from ${file.name}`);
+    createAuditLog('Extracted Protocol Rule', 'ProtocolRule', newRule.rule_id, `AI extracted rule from ${file.name}`, undefined, 'PENDING', 'watsonx.ai');
     return newRule;
   },
 
@@ -201,7 +204,7 @@ export const mockApi = {
       requires_human_approval: true
     };
     capas.push(newCapa);
-    createAuditLog('Generated CAPA Draft', 'CAPA', newCapa.capa_id, `AI generated CAPA for deviation ${deviation_id}`);
+    createAuditLog('Generated CAPA Draft', 'CAPA', newCapa.capa_id, `AI generated CAPA for deviation ${deviation_id}`, undefined, 'Draft', 'watsonx.ai');
     return newCapa;
   },
 
@@ -222,8 +225,9 @@ export const mockApi = {
     await delay(500);
     const rule = protocolRules.find(r => r.rule_id === rule_id);
     if (!rule) throw new Error('Rule not found');
+    const oldStatus = rule.approval_status;
     rule.approval_status = 'APPROVED';
-    createAuditLog('Approved Protocol Rule', 'ProtocolRule', rule_id, 'Human approved extracted rule');
+    createAuditLog('Approved Protocol Rule', 'ProtocolRule', rule_id, 'Human approved extracted rule', oldStatus, 'APPROVED', 'User Review');
     return rule;
   },
 
@@ -232,8 +236,9 @@ export const mockApi = {
     await delay(500);
     const rule = protocolRules.find(r => r.rule_id === rule_id);
     if (!rule) throw new Error('Rule not found');
+    const oldStatus = rule.approval_status;
     rule.approval_status = 'REJECTED';
-    createAuditLog('Rejected Protocol Rule', 'ProtocolRule', rule_id, 'Human rejected extracted rule');
+    createAuditLog('Rejected Protocol Rule', 'ProtocolRule', rule_id, 'Human rejected extracted rule', oldStatus, 'REJECTED', 'User Review');
     return rule;
   },
 
@@ -242,8 +247,9 @@ export const mockApi = {
     await delay(600);
     const capa = capas.find(c => c.capa_id === capa_id);
     if (!capa) throw new Error('CAPA not found');
+    const oldStatus = capa.status;
     capa.status = 'Approved';
-    createAuditLog('Approved CAPA', 'CAPA', capa_id, 'Human approved CAPA');
+    createAuditLog('Approved CAPA', 'CAPA', capa_id, 'Human approved CAPA', oldStatus, 'Approved', 'User Review');
     return capa;
   },
 
@@ -252,8 +258,9 @@ export const mockApi = {
     await delay(600);
     const capa = capas.find(c => c.capa_id === capa_id);
     if (!capa) throw new Error('CAPA not found');
+    const oldStatus = capa.status;
     capa.status = 'Rejected';
-    createAuditLog('Rejected CAPA', 'CAPA', capa_id, 'Human rejected CAPA');
+    createAuditLog('Rejected CAPA', 'CAPA', capa_id, 'Human rejected CAPA', oldStatus, 'Rejected', 'User Review');
     return capa;
   },
 

@@ -5,6 +5,6 @@ export * from './DeviationCenter';
 export * from './PatientTimeline';
 export * from './CapaManagement';
 export * from './ProtocolRuleViewer';
+export * from './AuditTrail';
 
 // Placeholders for upcoming phases
-export const AuditTrail = () => <div className="p-8">Audit Trail (Phase 9)</div>;
