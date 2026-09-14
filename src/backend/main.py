@@ -43,6 +43,7 @@ load_dotenv()
 from src.backend.error_handlers import register_error_handlers
 from src.backend.routers.ai_routes import router as ai_router
 from src.backend.routers.engine_routes import router as engine_router
+from src.backend.routers.data_routes import router as data_router
 from src.backend.database import init_db
 
 # ---------------------------------------------------------------------------
@@ -112,6 +113,7 @@ register_error_handlers(app)
 # Mount routers
 app.include_router(ai_router)
 app.include_router(engine_router)
+app.include_router(data_router)
 
 
 # ---------------------------------------------------------------------------
