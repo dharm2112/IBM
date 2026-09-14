@@ -1,0 +1,766 @@
+{
+  "meta": {
+    "schema_version": "1.0.0",
+    "protocol_id": "PROTO-DECLARE-TIMI58-V1",
+    "nct_id": "NCT01986881",
+    "trial_acronym": "DECLARE-TIMI 58",
+    "rule_engine": "TrialGuard Deterministic Rule Engine v1",
+    "rule_count": 20,
+    "generated_by": "Member 1 — Protocol Design",
+    "description": "Canonical executable rules for the TrialGuard deterministic rule engine. Rules are grouped by category. Every rule carries a source_type that distinguishes SOURCE_DERIVED facts (confirmed in NCT01986881 / Wiviott NEJM 2019 / ICH E6(R2)) from SYNTHETIC_ASSUMPTION values (reasonable industry convention, not explicitly published for this trial). AI (watsonx.ai) NEVER makes the final deviation determination for any rule in this file. All evaluation is deterministic Python.",
+    "severity_definitions": {
+      "major": "Patient safety risk, eligibility violation, mandatory safety visit/data missed, blinding broken, or study drug substantially wrong. Must be reported and reviewed.",
+      "minor": "Non-safety visit window exceeded, required non-safety lab absent, dose compliance below threshold, secondary endpoint data missing.",
+      "administrative": "No patient safety or data integrity impact; process/documentation shortfall only."
+    },
+    "comparator_semantics": {
+      "eq":        "actual == expected_value.value",
+      "between":   "expected_value.value - tolerance.lower <= actual <= expected_value.value + tolerance.upper",
+      "gte":       "actual >= expected_value.value",
+      "lte":       "actual <= expected_value.value",
+      "not_in":    "actual NOT IN expected_value.prohibited_list",
+      "present":   "actual IS NOT NULL (field exists and is non-null)",
+      "absent":    "actual IS NULL or value equals forbidden_value"
+    }
+  },
+
+  "rules": [
+
+    {
+      "rule_id": "DOSE-001",
+      "category": "dosing",
+      "name": "First Dose Dispensed at Randomisation",
+      "description": "The active-arm patient must receive dapagliflozin 10 mg at the randomisation visit (V-RAND). Absence of a dispensing record on randomisation day is a major deviation.",
+      "condition": "dosing_events.drug_code == 'DAPAGLI-10' AND dosing_events.visit_id == 'V-RAND' AND patients.arm == 'ARM-ACTIVE'",
+      "expected_value": {
+        "present_required": true,
+        "value": 10,
+        "unit": "mg"
+      },
+      "tolerance": null,
+      "comparator": "present",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE"],
+      "applies_to_visits": ["V-RAND"],
+      "evidence_fields": [
+        { "field": "dosing_events.visit_id",    "table": "dosing_events", "required": true },
+        { "field": "dosing_events.drug_code",   "table": "dosing_events", "required": true },
+        { "field": "dosing_events.actual_dose", "table": "dosing_events", "required": true },
+        { "field": "patients.arm",              "table": "patients",      "required": true }
+      ],
+      "deviation_type": "first_dose_missing",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ClinicalTrials.gov NCT01986881 — Interventions: Dapagliflozin 10 mg oral QD starting at randomisation",
+        "protocol_section": "Section 5.1 — Study Drug Administration",
+        "verbatim": "Study drug will be dispensed to the patient at the randomisation visit. The first dose will be taken at the site."
+      }
+    },
+
+    {
+      "rule_id": "DOSE-002",
+      "category": "dosing",
+      "name": "Drug Compliance ≥ 70 % at Annual Assessment",
+      "description": "Pill-count or e-diary compliance must be ≥ 70 % at each annual assessment visit (V-M12, V-EOS). Compliance < 70 % is a minor deviation; < 50 % for any rolling 90-day window escalates to major.",
+      "condition": "dosing_events.compliance_pct < 70 AND visits.visit_id IN ('V-M12', 'V-EOS')",
+      "expected_value": {
+        "value": 70,
+        "unit": "%"
+      },
+      "tolerance": null,
+      "comparator": "gte",
+      "severity": "minor",
+      "severity_escalation": [
+        {
+          "condition": "dosing_events.compliance_pct < 50 FOR ANY rolling 90-day window",
+          "escalated_severity": "major",
+          "reason": "Sustained non-compliance invalidates per-protocol population assignment."
+        }
+      ],
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-M12", "V-EOS"],
+      "evidence_fields": [
+        { "field": "dosing_events.compliance_pct",      "table": "dosing_events", "required": true },
+        { "field": "dosing_events.visit_id",            "table": "dosing_events", "required": true },
+        { "field": "dosing_events.administration_date", "table": "dosing_events", "required": true }
+      ],
+      "deviation_type": "dose_compliance_below_threshold",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC — standard Phase III drug accountability convention",
+        "protocol_section": "Section 5.3 — Compliance Monitoring",
+        "verbatim": "Protocol compliance will be assessed by pill count at each annual visit. Compliance < 70 % should be documented as a protocol deviation.",
+        "assumption_note": "70 % threshold is industry-standard for Phase III CVOT trials. The exact threshold is not published in the NCT01986881 registry or the Wiviott NEJM 2019 primary publication."
+      }
+    },
+
+    {
+      "rule_id": "DOSE-003",
+      "category": "dosing",
+      "name": "Dapagliflozin Fixed Dose Integrity — 10 mg Only",
+      "description": "Dapagliflozin is a fixed-dose 10 mg tablet (ARM-ACTIVE). Any recorded dose other than 10 mg — whether a split, doubled, or transcription error — is a major deviation. There is zero tolerance: the tablet is not divisible.",
+      "condition": "dosing_events.drug_code == 'DAPAGLI-10' AND dosing_events.actual_dose != 10",
+      "expected_value": {
+        "value": 10,
+        "unit": "mg"
+      },
+      "tolerance": {
+        "lower": 0,
+        "upper": 0,
+        "unit": "mg"
+      },
+      "comparator": "eq",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "dosing_events.actual_dose",          "table": "dosing_events", "required": true },
+        { "field": "dosing_events.dose_unit",            "table": "dosing_events", "required": true },
+        { "field": "dosing_events.drug_code",            "table": "dosing_events", "required": true },
+        { "field": "dosing_events.administration_date",  "table": "dosing_events", "required": true },
+        { "field": "patients.arm",                       "table": "patients",      "required": true }
+      ],
+      "deviation_type": "dose_value_wrong",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ClinicalTrials.gov NCT01986881 — Drug: Dapagliflozin 10 mg; Wiviott NEJM 2019",
+        "protocol_section": "Section 5.1 — Study Drug Administration",
+        "verbatim": "The study drug dapagliflozin will be administered as a 10 mg tablet once daily. No dose modification is permitted."
+      }
+    },
+
+    {
+      "rule_id": "DOSE-004",
+      "category": "dosing",
+      "name": "Oral Route Mandatory — No Route Substitution",
+      "description": "Dapagliflozin must be administered orally. Any recorded route other than 'oral' is a major deviation because route directly determines pharmacokinetics and the study is designed for oral SGLT2 inhibition.",
+      "condition": "dosing_events.drug_code == 'DAPAGLI-10' AND dosing_events.route != 'oral'",
+      "expected_value": {
+        "value": "oral",
+        "unit": null
+      },
+      "tolerance": null,
+      "comparator": "eq",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "dosing_events.route",               "table": "dosing_events", "required": true },
+        { "field": "dosing_events.drug_code",           "table": "dosing_events", "required": true },
+        { "field": "dosing_events.administration_date", "table": "dosing_events", "required": true }
+      ],
+      "deviation_type": "wrong_administration_route",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ClinicalTrials.gov NCT01986881 — Interventions: Drug: Dapagliflozin — Oral Tablet",
+        "protocol_section": "Section 5.1 — Study Drug Administration",
+        "verbatim": "Dapagliflozin 10 mg oral tablet administered once daily."
+      }
+    },
+
+    {
+      "rule_id": "DOSE-005",
+      "category": "dosing",
+      "name": "Once-Daily Frequency — No Double-Dosing Within 24-Hour Window",
+      "description": "Each patient may receive at most one dapagliflozin dose per calendar day. Two dosing_events records for the same patient and drug_code on the same calendar day constitute a major deviation (pharmacodynamic overdose risk).",
+      "condition": "COUNT(dosing_events WHERE drug_code == 'DAPAGLI-10' AND DATE(administration_date) == target_date AND patient_id == p) > 1",
+      "expected_value": {
+        "value": 1,
+        "unit": "doses per calendar day"
+      },
+      "tolerance": null,
+      "comparator": "lte",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "dosing_events.patient_id",           "table": "dosing_events", "required": true },
+        { "field": "dosing_events.drug_code",            "table": "dosing_events", "required": true },
+        { "field": "dosing_events.administration_date",  "table": "dosing_events", "required": true }
+      ],
+      "deviation_type": "double_dose_same_day",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ClinicalTrials.gov NCT01986881 — Interventions: QD (once daily) dosing",
+        "protocol_section": "Section 5.1 — Study Drug Administration",
+        "verbatim": "Dapagliflozin 10 mg administered once daily."
+      }
+    },
+
+    {
+      "rule_id": "VISIT-001",
+      "category": "visit_window",
+      "name": "Screening Visit Timing — Within 14 Days Pre-Randomisation",
+      "description": "The screening visit must occur within 14 calendar days before the randomisation date (Day -14 to Day -1). A screening visit more than 14 days before randomisation risks stale eligibility data (HbA1c, eGFR).",
+      "condition": "visits.visit_id == 'V-SCREEN' AND (randomisation_day - visits.actual_day) > 14",
+      "expected_value": {
+        "value": 14,
+        "unit": "days before randomisation"
+      },
+      "tolerance": {
+        "lower": 0,
+        "upper": 14,
+        "unit": "days"
+      },
+      "window_absolute": {
+        "earliest_day": -21,
+        "latest_day": -1,
+        "comment": "Day 0 = randomisation. Earliest = Day -14 nominal minus 7-day grace = Day -21."
+      },
+      "comparator": "between",
+      "severity": "minor",
+      "severity_escalation": [
+        {
+          "condition": "Screening > 30 days before randomisation",
+          "escalated_severity": "major",
+          "reason": "Eligibility lab results (HbA1c, eGFR) are more than 30 days old and may no longer reflect true eligibility status."
+        }
+      ],
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-SCREEN"],
+      "evidence_fields": [
+        { "field": "visits.actual_date",     "table": "visits", "required": true },
+        { "field": "visits.visit_id",        "table": "visits", "required": true },
+        { "field": "visits.patient_id",      "table": "visits", "required": true },
+        { "field": "patients.enrollment_date","table": "patients", "required": true }
+      ],
+      "deviation_type": "visit_window_exceeded",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC — standard Phase III CVOT screening window convention",
+        "protocol_section": "Section 6.1 — Screening Visit",
+        "verbatim": "Screening procedures should be performed within 14 days prior to randomisation.",
+        "assumption_note": "14-day screening window is industry-standard for Phase III cardiovascular outcomes trials. The exact window is not published in the NCT01986881 registry."
+      }
+    },
+
+    {
+      "rule_id": "VISIT-002",
+      "category": "visit_window",
+      "name": "Month 2 Visit Window — Day 53 to Day 67",
+      "description": "The Month 2 follow-up visit must occur within Day 53–67 post-randomisation (Day 60 ± 7 days). A visit outside this window risks confounding the early tolerability and safety assessment.",
+      "condition": "visits.visit_id == 'V-M2' AND (visits.actual_day < 53 OR visits.actual_day > 67)",
+      "expected_value": {
+        "value": 60,
+        "unit": "days post-randomisation"
+      },
+      "tolerance": {
+        "lower": 7,
+        "upper": 7,
+        "unit": "days"
+      },
+      "window_absolute": {
+        "earliest_day": 53,
+        "latest_day": 67
+      },
+      "comparator": "between",
+      "severity": "minor",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-M2"],
+      "missed_visit_severity": "minor",
+      "evidence_fields": [
+        { "field": "visits.actual_date",    "table": "visits", "required": true },
+        { "field": "visits.scheduled_date", "table": "visits", "required": true },
+        { "field": "visits.status",         "table": "visits", "required": true },
+        { "field": "visits.visit_id",       "table": "visits", "required": true }
+      ],
+      "deviation_type": "visit_window_exceeded",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC — standard Phase III CVOT Month 2 window convention",
+        "protocol_section": "Section 6.3 — Month 2 Visit",
+        "verbatim": "The Month 2 visit should be scheduled approximately 2 months (±1 week) after randomisation.",
+        "assumption_note": "Day 60 ± 7 is standard for Month 2 treatment visits in Phase III CV trials; exact window not published for NCT01986881."
+      }
+    },
+
+    {
+      "rule_id": "VISIT-003",
+      "category": "visit_window",
+      "name": "Month 6 Safety Visit Window — Day 168 to Day 196",
+      "description": "The Month 6 safety visit must occur within Day 168–196 (Day 182 ± 14 days). This visit is safety-critical for SGLT2-class renal monitoring (eGFR) and cardiovascular safety assessment. A missed or late visit is a major deviation.",
+      "condition": "visits.visit_id == 'V-M6' AND (visits.actual_day < 168 OR visits.actual_day > 196 OR visits.status == 'missed')",
+      "expected_value": {
+        "value": 182,
+        "unit": "days post-randomisation"
+      },
+      "tolerance": {
+        "lower": 14,
+        "upper": 14,
+        "unit": "days"
+      },
+      "window_absolute": {
+        "earliest_day": 168,
+        "latest_day": 196
+      },
+      "comparator": "between",
+      "severity": "major",
+      "missed_visit_severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-M6"],
+      "evidence_fields": [
+        { "field": "visits.actual_date",    "table": "visits", "required": true },
+        { "field": "visits.scheduled_date", "table": "visits", "required": true },
+        { "field": "visits.status",         "table": "visits", "required": true },
+        { "field": "visits.visit_id",       "table": "visits", "required": true }
+      ],
+      "deviation_type": "safety_visit_missed_or_late",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC (window) — SOURCE_DERIVED (safety-critical classification based on SGLT2 class renal monitoring requirements and Wiviott NEJM 2019 renal composite endpoint)",
+        "protocol_section": "Section 6.4 — Month 6 Safety Visit",
+        "verbatim": "The Month 6 safety assessment is mandatory. Sites should reschedule within the window if the visit is missed.",
+        "assumption_note": "±14-day window for Month 6 is standard Phase III convention. Safety-critical flag is derived from SGLT2 class labelling (mandatory periodic renal function monitoring) confirmed in the dapagliflozin SmPC."
+      }
+    },
+
+    {
+      "rule_id": "VISIT-004",
+      "category": "visit_window",
+      "name": "Month 12 Annual Assessment Window — Day 351 to Day 379",
+      "description": "The Month 12 annual assessment must occur within Day 351–379 (Day 365 ± 14 days). Annual HbA1c and eGFR data feed pre-specified secondary and renal composite endpoints; missed data constitutes a minor deviation (or major if the patient is within 6 months of EOS).",
+      "condition": "visits.visit_id == 'V-M12' AND (visits.actual_day < 351 OR visits.actual_day > 379 OR visits.status == 'missed')",
+      "expected_value": {
+        "value": 365,
+        "unit": "days post-randomisation"
+      },
+      "tolerance": {
+        "lower": 14,
+        "upper": 14,
+        "unit": "days"
+      },
+      "window_absolute": {
+        "earliest_day": 351,
+        "latest_day": 379
+      },
+      "comparator": "between",
+      "severity": "minor",
+      "missed_visit_severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-M12"],
+      "evidence_fields": [
+        { "field": "visits.actual_date",    "table": "visits", "required": true },
+        { "field": "visits.scheduled_date", "table": "visits", "required": true },
+        { "field": "visits.status",         "table": "visits", "required": true },
+        { "field": "visits.visit_id",       "table": "visits", "required": true }
+      ],
+      "deviation_type": "visit_window_exceeded",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC (day anchor and window) — SOURCE_DERIVED (annual assessments implied by 4-year trial duration in Wiviott NEJM 2019)",
+        "protocol_section": "Section 6.5 — Annual Assessment Visit",
+        "verbatim": "Annual safety assessments including HbA1c and renal function are required at 12-month intervals.",
+        "assumption_note": "Day 365 ± 14 is standard for annual visits in Phase III CVOT trials; exact window not published for NCT01986881."
+      }
+    },
+
+    {
+      "rule_id": "VISIT-005",
+      "category": "visit_window",
+      "name": "End-of-Study Visit — Must Occur Before or On Day 1461",
+      "description": "The End-of-Study visit must be completed by Day 1461 (approximately 4 years post-randomisation, matching the published ~4.2-year median follow-up). It may occur up to 30 days early. It is both a safety-critical visit and the primary endpoint data collection point; a missed EOS visit is a major deviation.",
+      "condition": "visits.visit_id == 'V-EOS' AND (visits.actual_day > 1461 OR visits.status == 'missed')",
+      "expected_value": {
+        "value": 1461,
+        "unit": "days post-randomisation"
+      },
+      "tolerance": {
+        "lower": 30,
+        "upper": 0,
+        "unit": "days"
+      },
+      "window_absolute": {
+        "earliest_day": 1431,
+        "latest_day": 1461
+      },
+      "comparator": "between",
+      "severity": "major",
+      "missed_visit_severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-EOS"],
+      "evidence_fields": [
+        { "field": "visits.actual_date",    "table": "visits", "required": true },
+        { "field": "visits.scheduled_date", "table": "visits", "required": true },
+        { "field": "visits.status",         "table": "visits", "required": true },
+        { "field": "visits.visit_id",       "table": "visits", "required": true }
+      ],
+      "deviation_type": "primary_endpoint_visit_missed",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC (Day 1461 anchor) — SOURCE_DERIVED (median follow-up ~4.2 years, Wiviott NEJM 2019 Table 1)",
+        "protocol_section": "Section 6.6 — End of Study Visit",
+        "verbatim": "The end-of-study visit will be conducted at study closure. All primary endpoint data must be collected at this visit.",
+        "assumption_note": "Day 1461 (~4 years) derived from published median follow-up of 4.2 years. Exact EOS day is patient-specific in the real trial; this is a fixed anchor for the demo synthetic cohort."
+      }
+    },
+
+    {
+      "rule_id": "MED-001",
+      "category": "medication",
+      "name": "Prohibited Concomitant SGLT2 Inhibitors",
+      "description": "No other SGLT2 inhibitor (canagliflozin, empagliflozin, ertugliflozin, ipragliflozin, luseogliflozin) may be used concurrently for any duration. Any overlap — regardless of dose or duration — is a major deviation because it introduces pharmacodynamic redundancy and unmeasured safety interaction not evaluated in this trial.",
+      "condition": "medications.drug_class == 'SGLT2 inhibitor' AND medications.drug_name NOT IN ('dapagliflozin') AND medications.start_date <= patient.study_end_date AND (medications.end_date IS NULL OR medications.end_date >= patient.enrollment_date)",
+      "expected_value": {
+        "prohibited_list": [
+          "canagliflozin",
+          "empagliflozin",
+          "ertugliflozin",
+          "ipragliflozin",
+          "luseogliflozin",
+          "sotagliflozin"
+        ]
+      },
+      "tolerance": null,
+      "comparator": "not_in",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "medications.drug_name",  "table": "medications", "required": true },
+        { "field": "medications.drug_class", "table": "medications", "required": true },
+        { "field": "medications.start_date", "table": "medications", "required": true },
+        { "field": "medications.end_date",   "table": "medications", "required": false },
+        { "field": "patients.enrollment_date","table": "patients",   "required": true }
+      ],
+      "deviation_type": "prohibited_concomitant_medication",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ClinicalTrials.gov NCT01986881 — Eligibility exclusion: patients on other SGLT2 inhibitors; Wiviott NEJM 2019 Methods",
+        "protocol_section": "Section 7.2 — Prohibited Medications",
+        "verbatim": "Concomitant use of other SGLT2 inhibitors is not permitted during the study."
+      }
+    },
+
+    {
+      "rule_id": "MED-002",
+      "category": "medication",
+      "name": "High-Dose Loop Diuretic — Requires Medical Monitor Notification",
+      "description": "Concurrent use of a loop diuretic at a dose equivalent to furosemide ≥ 80 mg/day (or equivalent torasemide ≥ 20 mg/day, bumetanide ≥ 2 mg/day) with dapagliflozin carries a risk of volume depletion and acute kidney injury. Initiation or dose escalation to these thresholds without documented Medical Monitor notification is a minor deviation.",
+      "condition": "medications.drug_class == 'loop_diuretic' AND medications.dose_mg_equivalent >= 80 AND medications.start_date >= patients.enrollment_date AND visit.monitoring_notification_recorded == false",
+      "expected_value": {
+        "value": 80,
+        "unit": "mg furosemide equivalent per day",
+        "prohibited_without_notification": true
+      },
+      "tolerance": null,
+      "comparator": "lte",
+      "severity": "minor",
+      "severity_escalation": [
+        {
+          "condition": "Loop diuretic dose equivalent ≥ 160 mg furosemide/day AND no notification",
+          "escalated_severity": "major",
+          "reason": "High risk of acute kidney injury combined with SGLT2-mediated osmotic diuresis."
+        }
+      ],
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "medications.drug_name",            "table": "medications", "required": true },
+        { "field": "medications.drug_class",           "table": "medications", "required": true },
+        { "field": "medications.dose",                 "table": "medications", "required": true },
+        { "field": "medications.start_date",           "table": "medications", "required": true }
+      ],
+      "deviation_type": "high_risk_concomitant_medication_without_notification",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC — dapagliflozin EU SmPC Section 4.4 Special Warnings; standard SGLT2-class volume depletion guidance",
+        "protocol_section": "Section 7.3 — Concomitant Medications Requiring Monitoring",
+        "verbatim": "Concomitant use of diuretics, particularly loop diuretics, may increase the risk of volume depletion. Medical Monitor notification is required if high-dose loop diuretics are initiated.",
+        "assumption_note": "Furosemide ≥ 80 mg/day threshold is derived from the dapagliflozin SmPC class warning. The specific notification requirement is not explicitly published in NCT01986881 registry entries."
+      }
+    },
+
+    {
+      "rule_id": "MED-003",
+      "category": "medication",
+      "name": "Warfarin Initiation — Requires Medical Monitor Notification and INR Monitoring",
+      "description": "Warfarin (or any vitamin K antagonist: acenocoumarol, phenprocoumon, fluindione) must not be initiated during the study without documented Medical Monitor notification. Once initiated, weekly INR monitoring is required. A new start without notification is a major deviation. This rule checks whether a warfarin record with start_date after enrollment exists without a linked monitoring_notification record.",
+      "condition": "medications.drug_class == 'vitamin_K_antagonist' AND medications.start_date >= patients.enrollment_date AND monitoring_notification.drug_code == 'warfarin' IS NULL",
+      "expected_value": {
+        "prohibited_without_notification": true,
+        "prohibited_list": ["warfarin", "acenocoumarol", "phenprocoumon", "fluindione"]
+      },
+      "tolerance": null,
+      "comparator": "not_in",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "medications.drug_name",   "table": "medications", "required": true },
+        { "field": "medications.drug_class",  "table": "medications", "required": true },
+        { "field": "medications.start_date",  "table": "medications", "required": true },
+        { "field": "patients.enrollment_date","table": "patients",    "required": true }
+      ],
+      "deviation_type": "prohibited_concomitant_medication",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC — dapagliflozin FDA label (drug interaction: vitamin K antagonists); matches DEV-003/MED-007 scenario in root.md",
+        "protocol_section": "Section 7.3 — Concomitant Medications Requiring Monitoring",
+        "verbatim": "Vitamin K antagonists should be used with caution. New initiation of warfarin requires Medical Monitor notification and weekly INR monitoring.",
+        "assumption_note": "Warfarin is not explicitly listed as prohibited in the published NCT01986881 registry. This rule is grounded in the dapagliflozin product labelling drug interaction guidance and is classified SYNTHETIC_ASSUMPTION for transparency."
+      }
+    },
+
+    {
+      "rule_id": "MED-004",
+      "category": "medication",
+      "name": "New Insulin Initiation — Requires Medical Monitor Approval",
+      "description": "Patients on background insulin at baseline may continue. However, new insulin initiation (no insulin at randomisation → insulin started ≥ Day 1) requires Medical Monitor approval. Unapproved new insulin initiation is a minor deviation because it confounds the glycaemic secondary endpoint (HbA1c change from baseline).",
+      "condition": "medications.drug_class == 'insulin' AND medications.start_date > patients.enrollment_date AND patients.baseline_insulin == false AND medical_monitor_approval.drug_class == 'insulin' IS NULL",
+      "expected_value": {
+        "prohibited_without_approval": true,
+        "applies_to_new_starts_only": true
+      },
+      "tolerance": null,
+      "comparator": "absent",
+      "severity": "minor",
+      "severity_escalation": [
+        {
+          "condition": "New insulin started without approval AND patient had no baseline insulin AND HbA1c endpoint visit is within 90 days",
+          "escalated_severity": "major",
+          "reason": "Confounds primary glycaemic endpoint assessment in the per-protocol population."
+        }
+      ],
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "medications.drug_class",        "table": "medications", "required": true },
+        { "field": "medications.start_date",        "table": "medications", "required": true },
+        { "field": "patients.enrollment_date",      "table": "patients",    "required": true },
+        { "field": "patients.baseline_insulin",     "table": "patients",    "required": true }
+      ],
+      "deviation_type": "unapproved_concomitant_medication_change",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC — standard Phase III T2D CVOT practice; new insulin initiation restriction common to SGLT2 inhibitor outcome trials",
+        "protocol_section": "Section 7.4 — Background Antidiabetic Therapy",
+        "verbatim": "Background antidiabetic therapy should remain stable throughout the study period. New insulin initiation requires Medical Monitor approval.",
+        "assumption_note": "New insulin initiation restriction is a common Phase III T2D trial constraint to protect glycaemic endpoint integrity. Patients on insulin at baseline (30.7% per Wiviott NEJM 2019 Table 1) were explicitly enrolled; only NEW initiation is restricted."
+      }
+    },
+
+    {
+      "rule_id": "LAB-001",
+      "category": "laboratory",
+      "name": "Screening HbA1c — Must Be Present and Within Eligibility Range 6.5–12.0 %",
+      "description": "HbA1c must be measured at the Screening visit (V-SCREEN). The result must fall within the eligibility range of 6.5–12.0 %. An absent result prevents eligibility confirmation (major). A result outside 6.5–12.0 % means the patient should not have been enrolled (major eligibility violation).",
+      "condition": "lab_results.test_code == 'HBA1C' AND lab_results.visit_id == 'V-SCREEN' AND (lab_results.result_value IS NULL OR lab_results.result_value < 6.5 OR lab_results.result_value > 12.0)",
+      "expected_value": {
+        "low": 6.5,
+        "high": 12.0,
+        "unit": "%",
+        "loinc_code": "4548-4"
+      },
+      "tolerance": null,
+      "comparator": "between",
+      "severity": "major",
+      "absent_severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-SCREEN"],
+      "evidence_fields": [
+        { "field": "lab_results.result_value", "table": "lab_results", "required": true },
+        { "field": "lab_results.test_code",    "table": "lab_results", "required": true },
+        { "field": "lab_results.result_unit",  "table": "lab_results", "required": true },
+        { "field": "lab_results.visit_id",     "table": "lab_results", "required": true },
+        { "field": "lab_results.patient_id",   "table": "lab_results", "required": true },
+        { "field": "lab_results.result_date",  "table": "lab_results", "required": true }
+      ],
+      "deviation_type": "eligibility_lab_out_of_range_or_absent",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ClinicalTrials.gov NCT01986881 — Inclusion Criterion 2: HbA1c ≥ 6.5 % and ≤ 12.0 % at screening; Wiviott NEJM 2019 Methods",
+        "protocol_section": "Section 4.1 — Inclusion Criteria / Section 6.1 — Screening",
+        "verbatim": "Glycated haemoglobin (HbA1c) value ≥ 6.5 % and ≤ 12.0 % at the time of screening."
+      }
+    },
+
+    {
+      "rule_id": "LAB-002",
+      "category": "laboratory",
+      "name": "Screening eGFR — Must Be ≥ 60 mL/min/1.73 m² (CKD-EPI)",
+      "description": "eGFR calculated by the CKD-EPI formula from serum creatinine must be ≥ 60 mL/min/1.73 m² at the Screening visit. This is an explicit inclusion criterion. An absent or below-threshold result means the patient should not have been enrolled. This is a major deviation in both cases.",
+      "condition": "lab_results.test_code == 'eGFR_CKD_EPI' AND lab_results.visit_id == 'V-SCREEN' AND (lab_results.result_value IS NULL OR lab_results.result_value < 60)",
+      "expected_value": {
+        "value": 60,
+        "unit": "mL/min/1.73m2",
+        "formula": "CKD-EPI (serum creatinine)",
+        "loinc_code": "62238-1"
+      },
+      "tolerance": null,
+      "comparator": "gte",
+      "severity": "major",
+      "absent_severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-SCREEN"],
+      "evidence_fields": [
+        { "field": "lab_results.result_value", "table": "lab_results", "required": true },
+        { "field": "lab_results.test_code",    "table": "lab_results", "required": true },
+        { "field": "lab_results.result_unit",  "table": "lab_results", "required": true },
+        { "field": "lab_results.visit_id",     "table": "lab_results", "required": true },
+        { "field": "lab_results.patient_id",   "table": "lab_results", "required": true },
+        { "field": "lab_results.result_date",  "table": "lab_results", "required": true }
+      ],
+      "deviation_type": "eligibility_lab_out_of_range_or_absent",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ClinicalTrials.gov NCT01986881 — Inclusion Criterion 4: eGFR ≥ 60 mL/min/1.73 m²; Wiviott NEJM 2019 Methods",
+        "protocol_section": "Section 4.1 — Inclusion Criteria / Section 6.1 — Screening",
+        "verbatim": "Estimated glomerular filtration rate (eGFR) ≥ 60 mL/min/1.73 m² at screening."
+      }
+    },
+
+    {
+      "rule_id": "LAB-003",
+      "category": "laboratory",
+      "name": "eGFR Monitoring at Safety-Critical Visits — Must Be Present",
+      "description": "eGFR must be measured and recorded at all safety-critical visits: V-M6 (Month 6), V-M12 (Month 12 annual), and V-EOS (End of Study). These visits feed the renal composite endpoint (pre-specified secondary outcome: sustained ≥ 40 % decrease in eGFR). An absent eGFR result at any of these visits is a major deviation because it directly impairs endpoint adjudication.",
+      "condition": "lab_results.test_code == 'eGFR_CKD_EPI' AND visits.visit_id IN ('V-M6', 'V-M12', 'V-EOS') AND lab_results.result_value IS NULL",
+      "expected_value": {
+        "present_required": true,
+        "loinc_code": "62238-1",
+        "unit": "mL/min/1.73m2"
+      },
+      "tolerance": null,
+      "comparator": "present",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-M6", "V-M12", "V-EOS"],
+      "evidence_fields": [
+        { "field": "lab_results.result_value", "table": "lab_results", "required": true },
+        { "field": "lab_results.test_code",    "table": "lab_results", "required": true },
+        { "field": "lab_results.result_date",  "table": "lab_results", "required": true },
+        { "field": "lab_results.visit_id",     "table": "lab_results", "required": true },
+        { "field": "lab_results.patient_id",   "table": "lab_results", "required": true }
+      ],
+      "deviation_type": "required_endpoint_lab_absent",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "Wiviott NEJM 2019 — Pre-specified renal composite endpoint: sustained ≥ 40 % eGFR decrease, ESRD, or renal/CV death; eGFR monitoring confirmed in publication supplementary appendix",
+        "protocol_section": "Section 8.3 — Secondary and Renal Endpoint Assessments",
+        "verbatim": "Renal function (eGFR by CKD-EPI) will be assessed at all scheduled visits including Month 6, annual assessments, and end of study."
+      }
+    },
+
+    {
+      "rule_id": "PROC-001",
+      "category": "procedural",
+      "name": "Informed Consent Obtained Before Any Study Procedure",
+      "description": "A signed Informed Consent Form (ICF) record must exist for the patient before any screening procedure is recorded. The ICF date must be ≤ the earliest screening lab or procedure date. An absent ICF or an ICF signed after a study procedure is a major deviation under ICH E6(R2) GCP 4.8.1.",
+      "condition": "NOT EXISTS (SELECT 1 FROM consent_records WHERE patient_id = p.patient_id AND consent_date <= (SELECT MIN(actual_date) FROM visits WHERE patient_id = p.patient_id))",
+      "expected_value": {
+        "present_required": true,
+        "timing": "ICF date must be on or before the earliest study procedure date"
+      },
+      "tolerance": null,
+      "comparator": "present",
+      "severity": "major",
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": ["V-SCREEN"],
+      "evidence_fields": [
+        { "field": "visits.actual_date",              "table": "visits",          "required": true },
+        { "field": "visits.data_entry_date",          "table": "visits",          "required": true },
+        { "field": "patients.patient_id",             "table": "patients",        "required": true },
+        { "field": "audit_logs.action",               "table": "audit_logs",      "required": true, "filter": "action = 'consent_signed'" },
+        { "field": "audit_logs.performed_at",         "table": "audit_logs",      "required": true }
+      ],
+      "deviation_type": "informed_consent_absent_or_late",
+      "protocol_reference": {
+        "source_type": "SOURCE_DERIVED",
+        "citation": "ICH E6(R2) GCP Section 4.8.1 — Informed consent must be obtained before any study-specific procedures are performed",
+        "protocol_section": "Section 3.4 — Informed Consent",
+        "verbatim": "Freely given informed consent must be obtained from each subject before any study-specific procedure is performed."
+      }
+    },
+
+    {
+      "rule_id": "PROC-002",
+      "category": "procedural",
+      "name": "Protocol Amendment Re-Consent — Within 14 Days of Amendment Effective Date",
+      "description": "When a protocol amendment is issued, patients must re-sign the updated ICF within 14 calendar days of the amendment effective date. Re-consent > 14 days is an administrative deviation. Re-consent > 30 days, or any study procedure performed after the amendment without re-consent, is a major deviation.",
+      "condition": "amendment_reconsent.reconsent_days_after_amendment > 14 WHERE amendment_reconsent.patient_id = patient_id AND amendment_reconsent.amendment_id = amendment_id",
+      "expected_value": {
+        "value": 14,
+        "unit": "calendar days after amendment effective date"
+      },
+      "tolerance": {
+        "lower": 0,
+        "upper": 0,
+        "unit": "days"
+      },
+      "comparator": "lte",
+      "severity": "administrative",
+      "severity_escalation": [
+        {
+          "condition": "Re-consent > 30 days after amendment effective date",
+          "escalated_severity": "major",
+          "reason": "Patient participated in study procedures under an unapproved consent version for > 30 days."
+        },
+        {
+          "condition": "Study procedure performed after amendment effective date without re-consent",
+          "escalated_severity": "major",
+          "reason": "Patient performed protocol procedures without valid informed consent — GCP 4.8.2 violation."
+        }
+      ],
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "audit_logs.action",           "table": "audit_logs",      "required": true, "filter": "action = 'amendment_reconsent_signed'" },
+        { "field": "audit_logs.performed_at",     "table": "audit_logs",      "required": true },
+        { "field": "protocol_versions.effective_date","table": "protocol_versions","required": true },
+        { "field": "patients.patient_id",         "table": "patients",        "required": true }
+      ],
+      "deviation_type": "consent_delay",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC (14-day window) — SOURCE_DERIVED: ICH E6(R2) GCP 4.8.2 re-consent requirement after protocol amendment; matches CONSENT-001/DEV-007 in root.md",
+        "protocol_section": "Section 3.4 — Informed Consent",
+        "verbatim": "In the event of a protocol amendment, patients must re-sign the updated informed consent form within 14 days of the amendment effective date.",
+        "assumption_note": "The 14-day re-consent window is standard industry practice. ICH E6(R2) mandates re-consent but does not specify an exact day limit; 14 days is the assumed threshold for this trial."
+      }
+    },
+
+    {
+      "rule_id": "PROC-003",
+      "category": "procedural",
+      "name": "eCRF Data Entry — Within 5 Business Days of Visit",
+      "description": "All eCRF data for a visit must be entered within 5 business days of the visit date (data_entry_date − actual_date ≤ 5 business days). Late entry > 5 business days is an administrative deviation. A site-level pattern of ≥ 3 consecutive visits with lag > 10 business days escalates to a minor site-level deviation and triggers a site risk score component increase.",
+      "condition": "BUSINESS_DAYS(visits.data_entry_date, visits.actual_date) > 5",
+      "expected_value": {
+        "value": 5,
+        "unit": "business days"
+      },
+      "tolerance": {
+        "lower": 0,
+        "upper": 0,
+        "unit": "business days"
+      },
+      "comparator": "lte",
+      "severity": "administrative",
+      "severity_escalation": [
+        {
+          "condition": "≥ 3 consecutive visits at the same site with lag > 10 business days",
+          "escalated_severity": "minor",
+          "reason": "Systematic data entry lag indicates a site-level process failure; increases site risk score DataDelay component."
+        }
+      ],
+      "applies_to_arms": ["ARM-ACTIVE", "ARM-PLACEBO"],
+      "applies_to_visits": "ALL",
+      "evidence_fields": [
+        { "field": "visits.actual_date",      "table": "visits", "required": true },
+        { "field": "visits.data_entry_date",  "table": "visits", "required": true },
+        { "field": "visits.site_id",          "table": "visits", "required": true },
+        { "field": "visits.visit_id",         "table": "visits", "required": true },
+        { "field": "visits.patient_id",       "table": "visits", "required": true }
+      ],
+      "deviation_type": "late_data_entry",
+      "protocol_reference": {
+        "source_type": "SYNTHETIC_ASSUMPTION",
+        "citation": "SYNTHETIC — standard Phase III eCRF data entry timeliness standard; matches DATA-002/DEV-010 in root.md",
+        "protocol_section": "Section 9.1 — Data Collection and Management",
+        "verbatim": "All data must be entered into the eCRF within 5 business days of the visit or procedure date.",
+        "assumption_note": "5-business-day eCRF entry requirement is common in Phase III sponsor SOPs. The exact threshold is not published in the NCT01986881 registry."
+      }
+    }
+
+  ]
+}
