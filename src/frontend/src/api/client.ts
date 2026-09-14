@@ -1,4 +1,4 @@
-import { mockApi, setMockSites, setMockDeviations, addMockCapa } from './mock';
+import { mockApi, setMockSites, setMockDeviations, addMockCapa, addMockProtocolRules } from './mock';
 import type { Site, Deviation, Capa, ProtocolRule } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
@@ -184,22 +184,28 @@ export const api = {
     }
 
     // Map extracted rules to frontend ProtocolRule type
-    // We'll just return the first rule to match the mock signature, 
-    // or you could update the signature if the UI supports arrays.
-    if (result.rules && result.rules.length > 0) {
-      const extracted = result.rules[0];
-      const newRule: ProtocolRule = {
-        rule_id: extracted.rule_id || `RULE-${Math.floor(Math.random() * 1000)}`,
-        category: extracted.category || 'Extracted',
-        name: `Extracted: ${extracted.category}`,
-        description: extracted.description,
-        condition: 'extracted',
-        threshold: '0',
-        severity: (extracted.severity || 'MINOR').toUpperCase() as any,
-        protocol_reference: extracted.protocol_reference || 'PDF Extraction',
-        approval_status: extracted.status === 'pending' ? 'PENDING' : 'APPROVED'
-      };
-      return newRule;
+    const newRules: ProtocolRule[] = (result.rules || []).map((extracted: any) => ({
+      rule_id: extracted.rule_id || `RULE-${Math.floor(Math.random() * 1000)}`,
+      category: extracted.category || 'Extracted',
+      name: `Extracted: ${extracted.category}`,
+      description: extracted.description,
+      condition: extracted.condition,
+      expected_value: extracted.expected_value,
+      allowed_range: extracted.allowed_range,
+      unit: extracted.unit,
+      visit: extracted.visit,
+      severity_hint: extracted.severity_hint,
+      source_text: extracted.source_text,
+      confidence: extracted.confidence,
+      threshold: '0',
+      severity: (extracted.severity || 'MINOR').toUpperCase() as any,
+      protocol_reference: extracted.protocol_reference || (file.type === 'application/pdf' ? 'PDF Extraction' : 'Text Extraction'),
+      approval_status: extracted.status === 'pending' ? 'PENDING' : 'APPROVED'
+    }));
+
+    if (newRules.length > 0) {
+      addMockProtocolRules(newRules);
+      return newRules;
     }
     
     throw new Error('No rules were extracted from this document.');
@@ -239,6 +245,18 @@ export const api = {
 
   async getCapas() {
     return mockApi.getCapas();
+  },
+
+  async getProtocolRules() {
+    return mockApi.getProtocolRules();
+  },
+
+  async approveProtocolRule(rule_id: string) {
+    return mockApi.approveProtocolRule(rule_id);
+  },
+
+  async rejectProtocolRule(rule_id: string) {
+    return mockApi.rejectProtocolRule(rule_id);
   },
 
   async approveCapa(capa_id: string) {

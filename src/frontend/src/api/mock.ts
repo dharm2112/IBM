@@ -61,6 +61,7 @@ export const setMockSites = (newSites: Site[]) => { sites = newSites; };
 export const setMockDeviations = (newDevs: Deviation[]) => { deviations = newDevs; };
 export const setMockCapas = (newCapas: Capa[]) => { capas = newCapas; };
 export const addMockCapa = (newCapa: Capa) => { capas.push(newCapa); };
+export const addMockProtocolRules = (newRules: ProtocolRule[]) => { protocolRules.push(...newRules); };
 
 
 // ==========================================
@@ -208,6 +209,32 @@ export const mockApi = {
   async getCapas() {
     await delay(300);
     return [...capas];
+  },
+
+  // GET /api/protocol-rules
+  async getProtocolRules() {
+    await delay(300);
+    return [...protocolRules];
+  },
+
+  // POST /api/protocol-rules/{rule_id}/approve
+  async approveProtocolRule(rule_id: string) {
+    await delay(500);
+    const rule = protocolRules.find(r => r.rule_id === rule_id);
+    if (!rule) throw new Error('Rule not found');
+    rule.approval_status = 'APPROVED';
+    createAuditLog('Approved Protocol Rule', 'ProtocolRule', rule_id, 'Human approved extracted rule');
+    return rule;
+  },
+
+  // POST /api/protocol-rules/{rule_id}/reject
+  async rejectProtocolRule(rule_id: string) {
+    await delay(500);
+    const rule = protocolRules.find(r => r.rule_id === rule_id);
+    if (!rule) throw new Error('Rule not found');
+    rule.approval_status = 'REJECTED';
+    createAuditLog('Rejected Protocol Rule', 'ProtocolRule', rule_id, 'Human rejected extracted rule');
+    return rule;
   },
 
   // POST /api/capa/{capa_id}/approve
