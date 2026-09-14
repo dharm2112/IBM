@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/mock';
+import { api } from '../api/client';
 import type { Site } from '../api/types';
 import { DataTable, RiskBadge } from '../components';
-import { Search, Calculator, LineChart as LineChartIcon } from 'lucide-react';
+import type { Column } from '../components/DataTable';
+import { Search, Calculator } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 export const SiteRanking = () => {
@@ -48,8 +49,8 @@ export const SiteRanking = () => {
     return matchesSearch && matchesRisk;
   });
 
-  const columns = [
-    { key: 'rank', header: 'Rank', render: (_: Site, index: number) => <span className="font-semibold text-base-muted">{index + 1}</span> },
+  const columns: Column<Site>[] = [
+    { key: 'rank', header: 'Rank', render: (s: Site) => <span className="font-semibold text-base-muted">{filteredSites.indexOf(s) + 1}</span> },
     { key: 'id', header: 'Site', render: (s: Site) => (
       <div>
         <div className="font-medium text-base-ink">{s.site_name}</div>
@@ -146,12 +147,9 @@ export const SiteRanking = () => {
       {/* Table */}
       <DataTable 
         data={filteredSites} 
-        columns={columns.map((col, index) => ({
-          ...col,
-          render: (row) => col.render(row, index)
-        }))} 
+        columns={columns} 
         keyField="site_id"
-        onRowClick={(site) => navigate(`/sites/${site.site_id}`)}
+        onRowClick={(site: Site) => navigate(`/sites/${site.site_id}`)}
       />
     </div>
   );

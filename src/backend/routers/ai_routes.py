@@ -30,9 +30,11 @@ any response body.
 
 from __future__ import annotations
 
+import io
 import logging
 
-from fastapi import APIRouter, Depends
+import pypdf
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 
 from src.ai.capa_generator import CapaGenerator, DeviationDetail
 from src.ai.protocol_extractor import ProtocolExtractor
@@ -101,6 +103,76 @@ def extract_protocol(
 
     logger.info(
         "POST /ai/extract-protocol complete | rules=%d | warnings=%d",
+        result.rule_count,
+        len(result.warnings),
+    )
+
+    return ExtractProtocolResponse(
+        rule_count=result.rule_count,
+        rules=rules_out,
+        warnings=result.warnings,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /ai/extract-protocol-pdf
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/extract-protocol-pdf",
+    response_model=ExtractProtocolResponse,
+    summary="Extract protocol rules from a PDF file",
+    description=(
+        "Upload a clinical trial protocol PDF. Extracts text using pypdf, then "
+        "uses IBM watsonx.ai to extract structured protocol rules. Every extracted "
+        "rule is assigned status='pending' and MUST be reviewed and approved by a "
+        "human before the deterministic rule engine may use it."
+    ),
+)
+def extract_protocol_pdf(
+    file: UploadFile = File(...),
+    svc: WatsonxService = Depends(get_watsonx),
+) -> ExtractProtocolResponse:
+    """
+    Extract structured protocol rules from an uploaded PDF.
+
+    Validates file type, extracts text, and delegates to ProtocolExtractor.
+    """
+    logger.info("POST /ai/extract-protocol-pdf | filename=%s | content_type=%s", file.filename, file.content_type)
+
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Uploaded file must be a PDF")
+
+    try:
+        content = file.file.read()
+        pdf = pypdf.PdfReader(io.BytesIO(content))
+        text_pages = []
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text_pages.append(page_text)
+        
+        extracted_text = "\n".join(text_pages)
+    except Exception as e:
+        logger.error("POST /ai/extract-protocol-pdf FAILED | pdf parse error: %s", str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)}")
+
+    if not extracted_text.strip():
+        raise HTTPException(status_code=400, detail="No extractable text found in PDF")
+
+    logger.info("POST /ai/extract-protocol-pdf | extracted text_chars=%d", len(extracted_text))
+
+    extractor = ProtocolExtractor(svc)
+    result = extractor.extract(extracted_text)
+
+    # Defensive: ensure status="pending" on every rule regardless of AI output.
+    rules_out = result.to_dict()["rules"]
+    for rule in rules_out:
+        rule["status"] = "pending"
+
+    logger.info(
+        "POST /ai/extract-protocol-pdf complete | rules=%d | warnings=%d",
         result.rule_count,
         len(result.warnings),
     )

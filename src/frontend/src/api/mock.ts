@@ -57,7 +57,6 @@ let auditLogs: AuditLog[] = [
   { audit_id: 'AL-003', timestamp: '2023-02-06T10:00:00Z', actor: 'watsonx.ai', action: 'Generated CAPA Draft', entity_type: 'CAPA', entity_id: 'CAPA-001', details: 'AI generated draft CAPA for DEV-002' },
 ];
 
-
 // ==========================================
 // UTILS
 // ==========================================
@@ -71,7 +70,7 @@ const createAuditLog = (action: string, entity_type: string, entity_id: string, 
     action,
     entity_type,
     entity_id,
-    details
+    details,
   });
 };
 
@@ -164,7 +163,7 @@ export const api = {
       approval_status: 'PENDING'
     };
     protocolRules.push(newRule);
-    createAuditLog('Uploaded Protocol', 'ProtocolRule', newRule.rule_id, `Extracted rule from ${file.name}`);
+    createAuditLog('Extracted Protocol Rule', 'ProtocolRule', newRule.rule_id, `AI extracted rule from ${file.name}`);
     return newRule;
   },
 

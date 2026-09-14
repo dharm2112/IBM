@@ -52,12 +52,19 @@ export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export interface ProtocolRule {
   rule_id: string;
   category: string;
-  name: string;
+  name?: string;
   description: string;
-  condition: string;
-  threshold: string;
-  severity: Severity;
-  protocol_reference: string;
+  condition?: string;
+  expected_value?: string;
+  allowed_range?: string;
+  unit?: string;
+  visit?: string;
+  severity_hint?: string;
+  source_text?: string;
+  confidence?: string;
+  threshold?: string;
+  severity?: Severity;
+  protocol_reference?: string;
   approval_status: ApprovalStatus;
 }
 
@@ -86,4 +93,7 @@ export interface AuditLog {
   entity_type: string;
   entity_id: string;
   details: string;
+  previous_status?: string;
+  new_status?: string;
+  source?: string;
 }
