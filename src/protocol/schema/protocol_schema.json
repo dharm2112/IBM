@@ -1,0 +1,423 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trialguard/protocol_schema/v1.0",
+  "title": "TrialGuard Canonical Protocol Representation",
+  "description": "JSON Schema for the TrialGuard clinical-trial protocol representation. Every object that can be traced to a public source carries a _provenance block. Synthetic assumptions are explicitly labelled.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "trial_metadata",
+    "eligibility",
+    "interventions",
+    "study_arms",
+    "visits",
+    "outcomes",
+    "protocol_constraints",
+    "executable_rule_refs"
+  ],
+  "additionalProperties": false,
+
+  "definitions": {
+    "provenance": {
+      "type": "object",
+      "description": "Traceability block carried by every protocol element. Distinguishes SOURCE_DERIVED facts from SYNTHETIC_ASSUMPTIONs.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["SOURCE_DERIVED", "SYNTHETIC_ASSUMPTION"],
+          "description": "SOURCE_DERIVED: value confirmed in public protocol or registry. SYNTHETIC_ASSUMPTION: value invented for demo realism — requires human review before production use."
+        },
+        "source": {
+          "type": "string",
+          "description": "Citation: ClinicalTrials.gov section, publication DOI, protocol version + page, or 'SYNTHETIC'."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional clarifying note about confidence or what was inferred."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "tolerance": {
+      "type": "object",
+      "description": "Symmetric or asymmetric tolerance window around a nominal value.",
+      "required": ["lower", "upper", "unit"],
+      "properties": {
+        "lower": { "type": "number", "description": "Allowable deviation below the nominal value (positive number)." },
+        "upper": { "type": "number", "description": "Allowable deviation above the nominal value (positive number)." },
+        "unit":  { "type": "string", "description": "Unit of the tolerance (e.g. 'days', 'mg', '%')." }
+      },
+      "additionalProperties": false
+    },
+
+    "rule_comparator": {
+      "type": "string",
+      "enum": ["eq", "between", "lte", "gte", "not_in", "present", "absent"],
+      "description": "Comparison operator used by the deterministic rule engine. eq=exact match, between=range check, not_in=prohibited list, present/absent=existence check."
+    },
+
+    "severity_level": {
+      "type": "string",
+      "enum": ["administrative", "minor", "major"],
+      "description": "ICH E6 GCP-aligned deviation severity. Determined by the deterministic rule matrix — NOT by AI alone."
+    }
+  },
+
+  "properties": {
+
+    "schema_version": {
+      "type": "string",
+      "description": "Semantic version of this schema.",
+      "example": "1.0.0"
+    },
+
+    "trial_metadata": {
+      "type": "object",
+      "description": "Section 1 — Immutable identity of the source trial. All downstream elements trace back here.",
+      "required": ["protocol_id", "nct_id", "title", "phase", "sponsor", "indication", "design", "source_refs", "_provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol_id":    { "type": "string", "description": "Internal TrialGuard protocol identifier (UUID)." },
+        "nct_id":         { "type": "string", "pattern": "^NCT[0-9]{8}$", "description": "ClinicalTrials.gov registration number." },
+        "title":          { "type": "string", "description": "Full official study title." },
+        "acronym":        { "type": "string", "description": "Protocol acronym (e.g. DECLARE-TIMI 58)." },
+        "phase":          { "type": "string", "enum": ["I", "II", "III", "IV", "I/II", "II/III"], "description": "Clinical trial phase." },
+        "sponsor":        { "type": "string", "description": "Primary sponsor organisation." },
+        "indication":     { "type": "string", "description": "Primary medical indication / condition studied." },
+        "design": {
+          "type": "object",
+          "description": "High-level study design flags.",
+          "properties": {
+            "randomised":        { "type": "boolean" },
+            "blinded":           { "type": "string", "enum": ["open", "single_blind", "double_blind", "triple_blind"] },
+            "parallel_groups":   { "type": "boolean" },
+            "placebo_controlled":{ "type": "boolean" },
+            "adaptive":          { "type": "boolean" }
+          }
+        },
+        "protocol_version": { "type": "string", "description": "Protocol amendment version used as basis for this schema instance." },
+        "effective_date":   { "type": "string", "format": "date", "description": "Date the protocol version became effective." },
+        "regulatory_ids": {
+          "type": "object",
+          "description": "EudraCT, IND, or other regulatory registration numbers.",
+          "additionalProperties": { "type": "string" }
+        },
+        "source_refs": {
+          "type": "array",
+          "description": "All public sources used to populate this protocol representation.",
+          "items": {
+            "type": "object",
+            "required": ["ref_type", "citation"],
+            "properties": {
+              "ref_type":  { "type": "string", "enum": ["clinicaltrials_gov", "publication", "protocol_pdf", "press_release", "fda_submission"] },
+              "citation":  { "type": "string" },
+              "url":       { "type": "string", "format": "uri" },
+              "accessed":  { "type": "string", "format": "date" }
+            }
+          }
+        },
+        "_provenance": { "$ref": "#/definitions/provenance" }
+      }
+    },
+
+    "eligibility": {
+      "type": "object",
+      "description": "Section 2 — Inclusion and exclusion criteria. Each criterion is individually traced and spawns one ELIG-* rule.",
+      "required": ["inclusion", "exclusion", "_provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "inclusion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["criterion_id", "description", "testable_condition", "rule_code", "_provenance"],
+            "properties": {
+              "criterion_id":       { "type": "string", "description": "e.g. IC-01" },
+              "description":        { "type": "string", "description": "Human-readable criterion text." },
+              "testable_condition": { "type": "string", "description": "Parameterised condition string the rule engine can evaluate." },
+              "threshold":          { "type": ["number", "null"], "description": "Numeric threshold if applicable." },
+              "unit":               { "type": "string" },
+              "comparator":         { "$ref": "#/definitions/rule_comparator" },
+              "rule_code":          { "type": "string", "description": "Primary executable rule reference (e.g. ELIG-001)." },
+              "severity_if_missed": { "$ref": "#/definitions/severity_level", "description": "Severity of deviation if enrolled patient violates this criterion." },
+              "_provenance":        { "$ref": "#/definitions/provenance" }
+            }
+          }
+        },
+        "exclusion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["criterion_id", "description", "testable_condition", "rule_code", "_provenance"],
+            "properties": {
+              "criterion_id":       { "type": "string" },
+              "description":        { "type": "string" },
+              "testable_condition": { "type": "string" },
+              "threshold":          { "type": ["number", "null"] },
+              "unit":               { "type": "string" },
+              "comparator":         { "$ref": "#/definitions/rule_comparator" },
+              "rule_code":          { "type": "string" },
+              "severity_if_violated": { "$ref": "#/definitions/severity_level" },
+              "_provenance":        { "$ref": "#/definitions/provenance" }
+            }
+          }
+        },
+        "_provenance": { "$ref": "#/definitions/provenance" }
+      }
+    },
+
+    "interventions": {
+      "type": "array",
+      "description": "Section 3 — All study drugs / interventions. Each intervention defines the dose, route, and frequency that the DOSE-* rules evaluate against.",
+      "items": {
+        "type": "object",
+        "required": ["intervention_id", "name", "type", "dose", "route", "frequency", "arms_assigned", "_provenance"],
+        "additionalProperties": false,
+        "properties": {
+          "intervention_id": { "type": "string" },
+          "name":            { "type": "string", "description": "INN drug name." },
+          "brand_name":      { "type": "string" },
+          "type":            { "type": "string", "enum": ["drug", "biologic", "device", "procedure", "placebo"] },
+          "dose": {
+            "type": "object",
+            "required": ["value", "unit"],
+            "properties": {
+              "value":     { "type": "number" },
+              "unit":      { "type": "string" },
+              "tolerance": { "$ref": "#/definitions/tolerance", "description": "Dose tolerance from protocol. If not published, marked SYNTHETIC_ASSUMPTION." }
+            }
+          },
+          "route":         { "type": "string", "enum": ["oral", "intravenous", "subcutaneous", "intramuscular", "topical", "inhaled", "other"] },
+          "frequency":     { "type": "string", "description": "Dosing frequency (e.g. QD, BID, weekly)." },
+          "duration":      { "type": "string", "description": "Total treatment duration (e.g. 'until primary endpoint adjudication')." },
+          "arms_assigned": { "type": "array", "items": { "type": "string" }, "description": "arm_ids this intervention applies to." },
+          "prohibited_combinations": {
+            "type": "array",
+            "description": "Drug classes or specific drugs explicitly prohibited while on this intervention. Source of MED-* rules.",
+            "items": {
+              "type": "object",
+              "required": ["name", "reason", "rule_code", "_provenance"],
+              "properties": {
+                "name":       { "type": "string" },
+                "drug_class": { "type": "string" },
+                "reason":     { "type": "string" },
+                "rule_code":  { "type": "string" },
+                "_provenance":{ "$ref": "#/definitions/provenance" }
+              }
+            }
+          },
+          "_provenance": { "$ref": "#/definitions/provenance" }
+        }
+      }
+    },
+
+    "study_arms": {
+      "type": "array",
+      "description": "Section 4 — Randomisation arms. Each patient is assigned exactly one arm; the arm determines which intervention expectations apply.",
+      "items": {
+        "type": "object",
+        "required": ["arm_id", "label", "type", "intervention_ids", "_provenance"],
+        "additionalProperties": false,
+        "properties": {
+          "arm_id":           { "type": "string", "description": "Unique arm identifier (e.g. ARM-ACTIVE, ARM-PLACEBO)." },
+          "label":            { "type": "string" },
+          "type":             { "type": "string", "enum": ["experimental", "active_comparator", "placebo_comparator", "no_intervention", "sham_comparator"] },
+          "intervention_ids": { "type": "array", "items": { "type": "string" } },
+          "allocation_ratio": { "type": "string", "description": "e.g. '1:1'" },
+          "blinded_to":       { "type": "array", "items": { "type": "string", "enum": ["patient", "investigator", "outcomes_assessor", "statistician"] } },
+          "target_n":         { "type": "integer", "description": "Target randomised n (per arm)." },
+          "_provenance":      { "$ref": "#/definitions/provenance" }
+        }
+      }
+    },
+
+    "visits": {
+      "type": "array",
+      "description": "Section 5 — Scheduled visit sequence. Each visit defines its day anchor, window, and mandatory procedures. Source of VISIT-* and LAB-* rules.",
+      "items": {
+        "type": "object",
+        "required": ["visit_id", "visit_number", "label", "type", "scheduled_day", "window", "mandatory_procedures", "_provenance"],
+        "additionalProperties": false,
+        "properties": {
+          "visit_id":        { "type": "string" },
+          "visit_number":    { "type": "integer" },
+          "label":           { "type": "string", "description": "Human-readable visit label (e.g. 'Month 6 Follow-up')." },
+          "type":            { "type": "string", "enum": ["screening", "randomisation", "treatment", "safety", "primary_endpoint", "end_of_study", "unscheduled"] },
+          "scheduled_day":   { "type": "integer", "description": "Nominal visit day relative to Day 0 (randomisation)." },
+          "window": {
+            "type": "object",
+            "required": ["lower_days", "upper_days", "_provenance"],
+            "properties": {
+              "lower_days":  { "type": "integer", "description": "Days before nominal day still within window (negative or 0)." },
+              "upper_days":  { "type": "integer", "description": "Days after nominal day still within window (positive)." },
+              "_provenance": { "$ref": "#/definitions/provenance" }
+            }
+          },
+          "is_safety_critical": { "type": "boolean", "description": "If true, a missed visit escalates to MAJOR severity." },
+          "is_primary_endpoint_visit": { "type": "boolean", "description": "If true, missing required endpoint data escalates to MAJOR severity." },
+          "mandatory_procedures": {
+            "type": "array",
+            "description": "Required assessments at this visit. Each generates a LAB-* or PROC-* rule.",
+            "items": {
+              "type": "object",
+              "required": ["procedure_id", "name", "type", "rule_code", "_provenance"],
+              "properties": {
+                "procedure_id":    { "type": "string" },
+                "name":            { "type": "string" },
+                "type":            { "type": "string", "enum": ["lab_test", "vital_signs", "ecg", "imaging", "questionnaire", "consent", "dose_dispensing", "randomisation", "physical_exam"] },
+                "loinc_code":      { "type": "string", "description": "LOINC code if a lab test — improves interoperability." },
+                "normal_range":    {
+                  "type": "object",
+                  "properties": {
+                    "low":  { "type": "number" },
+                    "high": { "type": "number" },
+                    "unit": { "type": "string" }
+                  }
+                },
+                "rule_code":       { "type": "string" },
+                "severity_if_absent": { "$ref": "#/definitions/severity_level" },
+                "_provenance":     { "$ref": "#/definitions/provenance" }
+              }
+            }
+          },
+          "visit_rule_code":  { "type": "string", "description": "VISIT-* rule code for the window check itself." },
+          "protocol_section": { "type": "string", "description": "Protocol section reference, e.g. 'Section 6.2 — Visit Schedule'." },
+          "_provenance":      { "$ref": "#/definitions/provenance" }
+        }
+      }
+    },
+
+    "outcomes": {
+      "type": "object",
+      "description": "Section 6 — Primary and secondary endpoints. Flags which visits and labs are endpoint-critical for severity escalation.",
+      "required": ["primary", "secondary", "_provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "primary": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["outcome_id", "label", "measure", "timeframe", "endpoint_visits", "_provenance"],
+            "properties": {
+              "outcome_id":       { "type": "string" },
+              "label":            { "type": "string" },
+              "measure":          { "type": "string", "description": "Statistical measure (e.g. 'time to first MACE event')." },
+              "timeframe":        { "type": "string", "description": "Measurement timeframe." },
+              "endpoint_visits":  { "type": "array", "items": { "type": "string" }, "description": "visit_ids where this endpoint is assessed." },
+              "adjudicated_by":   { "type": "string" },
+              "_provenance":      { "$ref": "#/definitions/provenance" }
+            }
+          }
+        },
+        "secondary": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["outcome_id", "label", "measure", "timeframe", "_provenance"],
+            "properties": {
+              "outcome_id":      { "type": "string" },
+              "label":           { "type": "string" },
+              "measure":         { "type": "string" },
+              "timeframe":       { "type": "string" },
+              "endpoint_visits": { "type": "array", "items": { "type": "string" } },
+              "_provenance":     { "$ref": "#/definitions/provenance" }
+            }
+          }
+        },
+        "_provenance": { "$ref": "#/definitions/provenance" }
+      }
+    },
+
+    "protocol_constraints": {
+      "type": "array",
+      "description": "Section 7 — Human-readable protocol rules with tolerances, before they are compiled to executable form. The bridge between source text and the rule engine.",
+      "items": {
+        "type": "object",
+        "required": ["constraint_id", "rule_code", "rule_type", "description", "applies_to", "comparator", "severity_if_violated", "source_text", "_provenance"],
+        "additionalProperties": false,
+        "properties": {
+          "constraint_id":   { "type": "string", "description": "Stable identifier for this constraint (e.g. PC-DOSE-001)." },
+          "rule_code":       { "type": "string", "description": "Corresponding executable rule code (e.g. DOSE-003)." },
+          "rule_type":       { "type": "string", "enum": ["visit_window", "dosing", "lab", "medication", "eligibility", "procedure", "safety", "consent", "blinding", "data_entry"] },
+          "description":     { "type": "string", "description": "Plain-English statement of the constraint." },
+          "applies_to": {
+            "type": "object",
+            "description": "Scope: which arms, visits, or patient attributes this constraint applies to.",
+            "properties": {
+              "arms":       { "type": "array", "items": { "type": "string" } },
+              "visits":     { "type": "array", "items": { "type": "string" }, "description": "visit_ids; empty = all visits." },
+              "visit_types":{ "type": "array", "items": { "type": "string" } },
+              "all_visits": { "type": "boolean" }
+            }
+          },
+          "expected_value": {
+            "type": "object",
+            "description": "The required value or set.",
+            "properties": {
+              "value":           { "type": ["number", "string", "null"] },
+              "unit":            { "type": "string" },
+              "prohibited_list": { "type": "array", "items": { "type": "string" }, "description": "For not_in comparator — list of prohibited values/drugs." },
+              "present_required":{ "type": "boolean", "description": "For present/absent comparator." }
+            }
+          },
+          "tolerance": { "$ref": "#/definitions/tolerance" },
+          "comparator": { "$ref": "#/definitions/rule_comparator" },
+          "severity_if_violated": { "$ref": "#/definitions/severity_level" },
+          "severity_escalation_conditions": {
+            "type": "array",
+            "description": "Conditions under which severity escalates beyond the baseline level.",
+            "items": { "type": "string" }
+          },
+          "source_text": { "type": "string", "description": "Verbatim or near-verbatim text from the protocol that this constraint was derived from." },
+          "protocol_section": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "pending_review", "superseded", "inactive"] },
+          "_provenance": { "$ref": "#/definitions/provenance" }
+        }
+      }
+    },
+
+    "executable_rule_refs": {
+      "type": "array",
+      "description": "Section 8 — Machine-layer index linking each constraint to the Python rule engine. Closes the traceability loop: source → constraint → rule_code → engine function → deviation.",
+      "items": {
+        "type": "object",
+        "required": ["rule_code", "constraint_id", "engine_function", "input_fields", "output_deviation_type", "_provenance"],
+        "additionalProperties": false,
+        "properties": {
+          "rule_code":             { "type": "string", "description": "Canonical rule code (e.g. DOSE-003) — joins to protocol_constraints[].rule_code and deviations[].rule_code." },
+          "constraint_id":         { "type": "string", "description": "Back-reference to protocol_constraints[].constraint_id." },
+          "engine_function":       { "type": "string", "description": "Python function/method name in the rule engine that evaluates this rule (e.g. 'evaluate_dose_range')." },
+          "engine_module":         { "type": "string", "description": "Python module path (e.g. 'src.rules.dose_rules')." },
+          "input_fields": {
+            "type": "array",
+            "description": "Patient data fields the engine function reads (joins this rule to the DB schema).",
+            "items": {
+              "type": "object",
+              "required": ["field_name", "source_table"],
+              "properties": {
+                "field_name":   { "type": "string" },
+                "source_table": { "type": "string", "description": "DB table name (dosing_events, lab_results, medications, visits, patients)." },
+                "required":     { "type": "boolean" }
+              }
+            }
+          },
+          "output_deviation_type": { "type": "string", "description": "Deviation category tag emitted when this rule fires (e.g. 'dosing_out_of_range')." },
+          "can_be_injected":       { "type": "boolean", "description": "If true, the synthetic data generator can inject a controlled deviation for this rule." },
+          "injection_parameters": {
+            "type": "object",
+            "description": "Parameters the synthetic injector uses to create a controlled deviation. Only present when can_be_injected=true.",
+            "properties": {
+              "field_to_mutate": { "type": "string" },
+              "mutation_type":   { "type": "string", "enum": ["out_of_range_high", "out_of_range_low", "null_value", "prohibited_value", "window_exceeded", "wrong_value"] },
+              "example_value":   { "type": ["number", "string"] }
+            }
+          },
+          "_provenance": { "$ref": "#/definitions/provenance" }
+        }
+      }
+    }
+
+  }
+}
