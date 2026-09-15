@@ -26,8 +26,7 @@ submission:
   title: ""                            # REQUIRED — Project display name, e.g., "SmartOps Dashboard"
 
   problem_statement: >                 # REQUIRED — 1-3 sentences. What problem? Who has it?
-    Replace this text with a concise description of the real-world problem
-    your project addresses and who experiences it.
+    Clinical research associates (CRAs) and study sponsors lack real-time, consolidated visibility into multi-site clinical trials. This fragmentation delays the detection of protocol deviations and adverse events, compromising patient safety, inflating trial costs, and risking regulatory audit failures.
 
   solution_summary: >                  # REQUIRED — 1-3 sentences. What did you build?
     Replace this text with a clear description of your solution
