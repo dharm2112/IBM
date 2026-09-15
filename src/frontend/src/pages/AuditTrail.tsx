@@ -53,13 +53,23 @@ const actionColor = (action: string) => {
 };
 
 // ─── Log Row ──────────────────────────────────────────────────────────────────
-const LogRow: React.FC<{ log: AuditLog }> = ({ log }) => {
+const LogRow: React.FC<{ log: AuditLog, index: number, isNew: boolean }> = ({ log, index, isNew }) => {
   const ts = new Date(log.timestamp);
   const dateStr = ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const timeStr = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
-    <tr style={{ borderBottom: '0.5px solid rgba(0,0,0,0.06)', height: 56, transition: 'background-color 0.12s', background: '#ffffff' }} onMouseOver={(e) => e.currentTarget.style.background = '#F5F5F7'} onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}>
+    <motion.tr 
+      initial={{ opacity: 0, y: 12, backgroundColor: isNew ? 'rgba(0,122,255,0.06)' : '#ffffff' }}
+      animate={{ opacity: 1, y: 0, backgroundColor: '#ffffff' }}
+      transition={{ 
+        opacity: { duration: 0.2, delay: index * 0.035, ease: [0.0, 0.0, 0.2, 1.0] },
+        y: { duration: 0.2, delay: index * 0.035, ease: [0.0, 0.0, 0.2, 1.0] },
+        backgroundColor: { duration: 0.6, delay: isNew ? 1.2 : 0, ease: 'easeOut' }
+      }}
+      style={{ borderBottom: '0.5px solid rgba(0,0,0,0.06)', height: 56 }} 
+      whileHover={{ backgroundColor: '#F5F5F7', transition: { duration: 0.1 } }}
+    >
       <td style={{ padding: '0 12px', verticalAlign: 'middle', width: 140, position: 'relative' }}>
         <div style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', width: 7, height: 7, borderRadius: '50%', background: actionColor(log.action) }} />
         <div style={{ paddingLeft: 12 }}>
@@ -83,7 +93,7 @@ const LogRow: React.FC<{ log: AuditLog }> = ({ log }) => {
       <td style={{ padding: '0 12px', verticalAlign: 'middle', width: 80, textAlign: 'right' }}>
         <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: '#AEAEB2' }}>{log.audit_id}</span>
       </td>
-    </tr>
+    </motion.tr>
   );
 };
 
@@ -251,9 +261,11 @@ export const AuditTrail = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((log) => (
-                  <LogRow key={log.audit_id} log={log} />
-                ))}
+                <AnimatePresence initial={false}>
+                  {filtered.map((log, index) => (
+                    <LogRow key={log.audit_id} log={log} index={index} isNew={newLogIds.has(log.audit_id)} />
+                  ))}
+                </AnimatePresence>
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ padding: 48, textAlign: 'center', fontSize: '13px', color: '#AEAEB2' }}>

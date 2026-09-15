@@ -106,12 +106,17 @@ const UploadPanel: React.FC<{ onUpload: (file: File) => Promise<void> }> = ({ on
         <span style={{ fontSize: '11px', color: T.sub }}>— IBM watsonx.ai will auto-extract rules</span>
       </div>
 
-      <div
+      <motion.div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
+        animate={isDragging ? { 
+          scale: 1.02, 
+          boxShadow: ['0 0 0 rgba(0,122,255,0.4)', '0 0 20px rgba(0,122,255,0.8)', '0 0 0 rgba(0,122,255,0.4)']
+        } : { scale: 1, boxShadow: '0 0 0 rgba(0,122,255,0)' }}
+        transition={isDragging ? { duration: 1.2, ease: 'easeInOut', repeat: Infinity } : { duration: 0.2 }}
         style={{ 
-          margin: 20, padding: 32, textAlign: 'center', border: `2px dashed ${isDragging ? T.accent : T.border}`, borderRadius: 12, background: isDragging ? T.blueBg : T.surface, transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+          margin: 20, padding: 32, textAlign: 'center', border: `2px dashed ${isDragging ? T.accent : T.border}`, borderRadius: 12, background: isDragging ? T.blueBg : T.surface, transition: 'background 0.2s, border 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
         }}
       >
         {isUploading ? (
@@ -143,7 +148,7 @@ const UploadPanel: React.FC<{ onUpload: (file: File) => Promise<void> }> = ({ on
             )}
           </div>
         )}
-      </div>
+      </motion.div>
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }

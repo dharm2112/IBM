@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../api/client';
 import type { Capa, Deviation } from '../api/types';
 import { SeverityBadge, AIBanner, ApprovalActions } from '../components';
@@ -26,6 +26,21 @@ const T = {
   amberBg:  '#FFF8E6',
 };
 
+// ─── Badge Animator ────────────────────────────────────────────────────────────
+const AnimatedBadge: React.FC<{ count: number; bg: string; color: string }> = ({ count, bg, color }) => {
+  return (
+    <motion.span
+      key={count}
+      initial={{ scale: 1.3 }}
+      animate={{ scale: 1.0 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 35 }} // --ease-spring
+      style={{ width: 18, height: 18, borderRadius: '50%', background: bg, color: color, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      {count}
+    </motion.span>
+  );
+};
+
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 const STAGES: Capa['status'][] = ['Draft', 'Pending Review', 'Approved', 'Rejected', 'Closed'];
 
@@ -37,10 +52,51 @@ const stageColor: Record<string, any> = {
   'Closed':         { bg: T.surface2, color: T.muted },
 };
 
+interface CapaCardProps {
+  capa: Capa;
+  deviation?: Deviation;
+  onSelect: (capa: Capa) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+}
+
 const CapaCard: React.FC<CapaCardProps> = ({ capa, deviation, onSelect, onApprove, onReject }) => {
   const isApproved = capa.status === 'Approved';
+  const [actionState, setActionState] = useState<'idle' | 'approving' | 'rejecting'>('idle');
+
+  const handleApprove = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActionState('approving');
+    await new Promise(r => setTimeout(r, 450)); // 200ms flash + 250ms slide up
+    onApprove(capa.capa_id);
+  };
+
+  const handleReject = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActionState('rejecting');
+    await new Promise(r => setTimeout(r, 600)); // 400ms shake + 200ms fade out
+    onReject(capa.capa_id);
+  };
+
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ 
+        opacity: actionState === 'rejecting' ? 0 : actionState === 'approving' ? 0 : 1, 
+        scale: actionState === 'rejecting' ? 0.95 : 1,
+        y: actionState === 'approving' ? -8 : 0,
+        x: actionState === 'rejecting' ? [0, -6, 6, -4, 4, 0] : 0,
+        borderColor: actionState === 'approving' ? '#34C759' : 'rgba(0,0,0,0.08)'
+      }}
+      transition={{ 
+        layout: { type: 'spring', stiffness: 500, damping: 35 },
+        opacity: { duration: 0.2 },
+        scale: { duration: 0.3, ease: [0.175, 0.885, 0.32, 1.275] }, // --ease-overshoot for enter
+        y: { duration: 0.25, ease: [0.4, 0.0, 1.0, 1.0] }, // --ease-accelerate
+        x: { duration: 0.4 }, // shake
+        borderColor: { duration: 0.2 }
+      }}
       onClick={() => onSelect(capa)}
       style={{
         background: '#ffffff',
@@ -83,15 +139,22 @@ const CapaCard: React.FC<CapaCardProps> = ({ capa, deviation, onSelect, onApprov
 
       {capa.requires_human_approval && capa.status === 'Pending Review' && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => onReject(capa.capa_id)} style={{ flex: 1, height: 32, background: 'rgba(255,59,48,0.08)', color: '#FF3B30', border: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '13px', cursor: 'pointer' }}>
+          <button onClick={handleReject} style={{ flex: 1, height: 32, background: 'rgba(255,59,48,0.08)', color: '#FF3B30', border: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '13px', cursor: 'pointer' }}>
             <X size={14} /> Reject
           </button>
-          <button onClick={() => onApprove(capa.capa_id)} style={{ flex: 1, height: 32, background: '#34C759', color: '#fff', fontWeight: 500, border: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '13px', cursor: 'pointer' }}>
-            ✓ Approve
+          <button onClick={handleApprove} style={{ flex: 1, height: 32, background: '#34C759', color: '#fff', fontWeight: 500, border: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '13px', cursor: 'pointer' }}>
+            <motion.div
+              animate={{ rotate: actionState === 'approving' ? 360 : 0 }}
+              transition={{ duration: 0.3 }}
+              style={{ display: 'flex' }}
+            >
+              ✓
+            </motion.div>
+             Approve
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 
@@ -325,24 +388,32 @@ export const CAPAManagement = () => {
             <div key={stage} style={{ display: 'flex', flexDirection: 'column', minWidth: 260 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6E6E73' }}>{stage}</span>
-                <span style={{ width: 18, height: 18, borderRadius: '50%', background: badgeBg, color: badgeColor, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{stageCaps.length}</span>
+                <AnimatedBadge count={stageCaps.length} bg={badgeBg} color={badgeColor} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                {stageCaps.length === 0 && (
-                  <div style={{ background: '#ffffff', border: '1px dashed rgba(0,0,0,0.12)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120, fontSize: '13px', color: '#AEAEB2' }}>
-                    No CAPAs
-                  </div>
-                )}
-                {stageCaps.map((capa) => (
-                  <CapaCard
-                    key={capa.capa_id}
-                    capa={capa}
-                    deviation={getDeviation(capa.deviation_id)}
-                    onSelect={setSelectedCapa}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-                  />
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {stageCaps.length === 0 && (
+                    <motion.div 
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{ background: '#ffffff', border: '1px dashed rgba(0,0,0,0.12)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120, fontSize: '13px', color: '#AEAEB2' }}
+                    >
+                      No CAPAs
+                    </motion.div>
+                  )}
+                  {stageCaps.map((capa) => (
+                    <CapaCard
+                      key={capa.capa_id}
+                      capa={capa}
+                      deviation={getDeviation(capa.deviation_id)}
+                      onSelect={setSelectedCapa}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                    />
+                  ))}
+                </AnimatePresence>
               </div>
             </div>
           );

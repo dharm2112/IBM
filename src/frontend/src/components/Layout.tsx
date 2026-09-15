@@ -1,5 +1,7 @@
 import { Outlet, NavLink, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { ProgressiveBlur } from './ProgressiveBlur';
+import { FramerSmoothScroll } from './FramerSmoothScroll';
 import {
   LayoutDashboard,
   Building2,
@@ -54,7 +56,7 @@ const NavItem = ({
               borderRadius: 8,
               background: 'rgba(0,122,255,0.10)',
             }}
-            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1.0] }} // --ease-spring
           />
         )}
         <motion.div
@@ -71,11 +73,19 @@ const NavItem = ({
             cursor: 'pointer',
             borderRadius: 8,
             zIndex: 1,
+            // Delay color transition if becoming active
+            transition: 'color 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            transitionDelay: isActive ? '150ms' : '0ms'
           }}
           whileHover={!isActive ? { background: 'rgba(0,0,0,0.04)' } : undefined}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.15 }} // --dur-fast
         >
-          <span style={{ color: isActive ? T.accent : '#6E6E73', display: 'flex' }}>{icon}</span>
+          <span style={{ 
+            color: isActive ? T.accent : '#6E6E73', 
+            display: 'flex',
+            transition: 'color 150ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            transitionDelay: isActive ? '150ms' : '0ms'
+          }}>{icon}</span>
           <span>{label}</span>
         </motion.div>
       </div>
@@ -220,26 +230,30 @@ const Layout = () => {
         </motion.header>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', paddingTop: 64 }}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.2, ease }}
-              style={{ maxWidth: 1200, margin: '0 auto', padding: '0 40px 40px 40px' }}
-            >
-              {/* Page content */}
-              {location.pathname !== '/dashboard/capa' && (
-                <h1 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 32px 0', color: T.text, letterSpacing: '-0.01em' }}>
-                  {pageTitle}
-                </h1>
-              )}
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+        <main style={{ flex: 1, overflow: 'hidden', paddingTop: 64 }}>
+          <FramerSmoothScroll>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.0, 0.0, 0.2, 1.0] } }} // --ease-decelerate
+                exit={{ opacity: 0, y: -8, transition: { duration: 0.2, ease: [0.4, 0.0, 1.0, 1.0] } }} // --ease-accelerate
+                style={{ maxWidth: 1200, margin: '0 auto', padding: '0 40px 40px 40px' }}
+              >
+                {/* Page content */}
+                {location.pathname !== '/dashboard/capa' && (
+                  <h1 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 32px 0', color: T.text, letterSpacing: '-0.01em' }}>
+                    {pageTitle}
+                  </h1>
+                )}
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
+          </FramerSmoothScroll>
         </main>
+        
+        {/* Global Progressive Blur applied to all pages */}
+        <ProgressiveBlur position="bottom" height="100px" />
       </div>
     </div>
   );

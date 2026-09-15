@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   motion,
@@ -20,6 +20,43 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
+
+// ─── Smooth Scroll Wrapper ──────────────────────────────────────────────────────
+const SmoothScrollWrapper = ({ children }: { children: React.ReactNode }) => {
+  const { scrollY } = useScroll();
+  const y = useTransform(useSpring(scrollY, { damping: 20, mass: 0.1, stiffness: 100, restDelta: 0.001 }), (v) => -v);
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const observer = new ResizeObserver((entries) => {
+      setHeight(entries[0].contentRect.height);
+    });
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <>
+      <div style={{ height }} />
+      <motion.div
+        ref={ref}
+        style={{
+          y,
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          willChange: "transform",
+          zIndex: 0,
+        }}
+      >
+        {children}
+      </motion.div>
+    </>
+  );
+};
 
 // ─── Reusable fade-up on scroll ──────────────────────────────────────────────
 const FadeUp = ({
@@ -239,9 +276,10 @@ const LandingPage = () => {
   const heroY = useTransform(scrollY, [0, 400], [0, -60]);
 
   return (
-    <div style={{ background: '#0A0A0F', minHeight: '100vh', color: '#fff', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' }}>
+    <SmoothScrollWrapper>
+      <div style={{ background: '#0A0A0F', minHeight: '100vh', color: '#fff', fontFamily: 'Inter, sans-serif', overflowX: 'hidden' }}>
 
-      {/* ── Global Styles ── */}
+        {/* ── Global Styles ── */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
@@ -776,7 +814,8 @@ const LandingPage = () => {
         Built with IBM watsonx.ai · Clinical Ops Intelligence · {new Date().getFullYear()}
       </footer>
 
-    </div>
+      </div>
+    </SmoothScrollWrapper>
   );
 };
 

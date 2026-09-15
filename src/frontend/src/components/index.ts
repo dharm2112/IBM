@@ -3,10 +3,12 @@ export * from './SeverityBadge';
 export * from './StatCard';
 export * from './DataTable';
 export * from './AIBanner';
+export * from './FolderComponent';
+export * from './AnimatedList';
+export * from './FramerSmoothScroll';
+export * from './ProgressiveBlur';
 export * from './EvidencePanel';
 export * from './Timeline';
 export * from './ApprovalActions';
 export * from './DetailDrawer';
 export { default as Layout } from './Layout';
-export * from './FolderComponent';
-

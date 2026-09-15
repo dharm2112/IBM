@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, useInView } from 'motion/react';
+import { motion, AnimatePresence, useInView, animate } from 'motion/react';
 import { api } from '../api/client';
 import type { Site, Deviation } from '../api/types';
-import { EvidencePanel } from '../components';
+import { EvidencePanel, AnimatedList } from '../components';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
   LineChart, Line, XAxis, Tooltip, ReferenceLine
@@ -32,20 +32,21 @@ const T = {
 const ease = [0.22, 1, 0.36, 1];
 
 // ── Animated counter ──────────────────────────────────────────────────────────
-const Counter = ({ to, duration = 1.2 }: { to: number; duration?: number }) => {
+const Counter = ({ to, duration = 0.6 }: { to: number; duration?: number }) => {
   const [val, setVal] = useState(0);
   const ref = useRef(null);
   const inView = useInView(ref, { once: true });
+  
   useEffect(() => {
     if (!inView) return;
-    let cur = 0;
-    const step = to / (duration * 60);
-    const id = setInterval(() => {
-      cur += step;
-      if (cur >= to) { setVal(to); clearInterval(id); }
-      else setVal(Math.floor(cur));
-    }, 1000 / 60);
-    return () => clearInterval(id);
+    const controls = animate(0, to, {
+      duration,
+      ease: [0.0, 0.0, 0.2, 1.0], // --ease-decelerate
+      onUpdate(value) {
+        setVal(Math.floor(value));
+      }
+    });
+    return () => controls.stop();
   }, [inView, to, duration]);
   return <span ref={ref}>{val}</span>;
 };
@@ -59,9 +60,10 @@ const KpiCard = ({
   accentBorder?: string; delay?: number;
 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4, delay, ease }}
+    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    transition={{ duration: 0.35, delay, ease: [0.175, 0.885, 0.32, 1.275] }} // --ease-overshoot
+    whileHover={{ y: -2, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
     style={{
       background: T.surface,
       border: `1px solid ${accentBorder ?? T.border}`,
@@ -71,6 +73,7 @@ const KpiCard = ({
       flexDirection: 'column',
       gap: 12,
       boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+      transition: 'box-shadow 150ms cubic-bezier(0.34, 1.56, 0.64, 1.0)',
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -119,6 +122,55 @@ const LightTooltip = ({ active, payload, label }: any) => {
       <div style={{ color: T.sub, marginBottom: 2 }}>{label}</div>
       <div style={{ fontWeight: 600, color: T.accent }}>{payload[0].value} deviations</div>
     </div>
+  );
+};
+
+// ── Recalculate Risk Button ───────────────────────────────────────────────────
+const RecalculateRiskButton = ({ isRecalculating, onClick }: { isRecalculating: boolean; onClick: () => Promise<void> }) => {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+
+  const handleClick = async () => {
+    if (status !== 'idle') return;
+    setStatus('loading');
+    await onClick();
+    setStatus('success');
+    setTimeout(() => setStatus('idle'), 400); // 400ms flash
+  };
+
+  return (
+    <motion.button
+      onClick={handleClick}
+      disabled={status !== 'idle'}
+      whileTap={{ scale: 0.96, transition: { duration: 0.08 } }}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        padding: '0 16px', height: 36, minWidth: 140, borderRadius: 10, border: 'none',
+        background: status === 'success' ? T.green : T.accent,
+        color: '#fff', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+        transition: 'background-color 400ms ease',
+      }}
+    >
+      <motion.div
+        animate={status === 'loading' ? { rotate: 360 } : { rotate: 0 }}
+        transition={status === 'loading' ? { repeat: Infinity, duration: 0.8, ease: 'linear' } : { duration: 0 }}
+        style={{ display: 'flex' }}
+      >
+        <Calculator size={14} />
+      </motion.div>
+      <AnimatePresence mode="popLayout">
+        {status !== 'loading' && (
+          <motion.span
+            key="label"
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 4 }}
+            transition={{ duration: 0.2 }}
+          >
+            {status === 'success' ? 'Updated' : 'Recalculate Risk'}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.button>
   );
 };
 
@@ -195,13 +247,10 @@ export const ExecutiveDashboard = () => {
             <RefreshCw size={14} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
             Refresh
           </button>
-          <button
-            onClick={handleRecalculate} disabled={isRecalculating}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 16px', height: 36, borderRadius: 10, border: 'none', background: T.accent, color: '#fff', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-          >
-            <Calculator size={14} style={{ animation: isRecalculating ? 'spin 1s linear infinite' : 'none' }} />
-            Recalculate Risk
-          </button>
+          <RecalculateRiskButton 
+            isRecalculating={isRecalculating} 
+            onClick={handleRecalculate} 
+          />
         </div>
       </motion.div>
 
@@ -243,7 +292,14 @@ export const ExecutiveDashboard = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={[{ value: 1 }]} innerRadius={70} outerRadius={85} dataKey="value" stroke="none" fill={T.surface2} isAnimationActive={false} />
-                <Pie data={riskDist} innerRadius={70} outerRadius={85} dataKey="value" stroke={T.surface} strokeWidth={2} cornerRadius={4} startAngle={90} endAngle={-270}>
+                <Pie 
+                  data={riskDist} innerRadius={70} outerRadius={85} dataKey="value" 
+                  stroke={T.surface} strokeWidth={2} cornerRadius={4} startAngle={90} endAngle={-270}
+                  isAnimationActive={true}
+                  animationBegin={200}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                >
                   {riskDist.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Pie>
                 <Tooltip contentStyle={{ display: 'none' }} />
@@ -275,16 +331,19 @@ export const ExecutiveDashboard = () => {
           </div>
           <div style={{ height: 200, marginTop: 10 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: T.sub }} axisLine={false} tickLine={false} dy={10} />
+              <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} dy={10} />
                 <ReferenceLine y={0} stroke={T.border} />
-                <Tooltip content={<LightTooltip />} cursor={{ stroke: T.borderLight, strokeWidth: 30 }} />
+                <Tooltip content={<LightTooltip />} cursor={{ stroke: T.borderLight, strokeWidth: 32 }} />
                 <Line
                   type="monotone" dataKey="deviations"
-                  stroke={T.accent} strokeWidth={2}
-                  dot={{ r: 4, fill: '#fff', strokeWidth: 2, stroke: T.accent }}
-                  activeDot={{ r: 6, fill: T.accent, strokeWidth: 0 }}
+                  stroke={T.accent} strokeWidth={3}
+                  dot={{ r: 4, strokeWidth: 2, fill: T.surface }}
+                  activeDot={{ r: 6, strokeWidth: 0, fill: T.accent }}
                   isAnimationActive={true}
+                  animationBegin={300}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -305,8 +364,9 @@ export const ExecutiveDashboard = () => {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {topSites.map((site, i) => (
-            <motion.div
+          <AnimatedList delay={150}>
+            {topSites.map((site, i) => (
+              <motion.div
               key={site.site_id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -331,6 +391,7 @@ export const ExecutiveDashboard = () => {
               <ArrowRight size={14} color={T.muted} />
             </motion.div>
           ))}
+          </AnimatedList>
         </div>
       </Card>
 
@@ -353,8 +414,9 @@ export const ExecutiveDashboard = () => {
           ))}
         </div>
 
-        {deviations.slice(0, 6).map((dev, i) => (
-          <div
+        <AnimatedList delay={150}>
+          {deviations.slice(0, 6).map((dev, i) => (
+            <div
             key={dev.deviation_id}
             onClick={() => setSelectedDeviation(dev)}
             style={{
@@ -378,9 +440,10 @@ export const ExecutiveDashboard = () => {
             </span>
           </div>
         ))}
+        </AnimatedList>
       </Card>
 
-      {/* ── Detail Drawer ── */}
+      {/* -- Detail Drawer -- */}
       <AnimatePresence>
         {selectedDeviation && (
           <>
