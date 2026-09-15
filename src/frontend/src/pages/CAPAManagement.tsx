@@ -27,13 +27,14 @@ const T = {
 };
 
 // ─── Badge Animator ────────────────────────────────────────────────────────────
+// ─── Badge Animator ────────────────────────────────────────────────────────────
 const AnimatedBadge: React.FC<{ count: number; bg: string; color: string }> = ({ count, bg, color }) => {
   return (
     <motion.span
       key={count}
       initial={{ scale: 1.3 }}
       animate={{ scale: 1.0 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 35 }} // --ease-spring
+      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
       style={{ width: 18, height: 18, borderRadius: '50%', background: bg, color: color, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
     >
       {count}

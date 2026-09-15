@@ -811,7 +811,7 @@ const LandingPage = () => {
 
       {/* ── Footer ───────────────────────────────────────────────────────────── */}
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '1.5rem', textAlign: 'center', fontSize: '0.75rem', color: '#3f3f46' }}>
-        Built with IBM watsonx.ai · Clinical Ops Intelligence · {new Date().getFullYear()}
+        Built with IBM watsonx.ai · TrialGuard Intelligence · {new Date().getFullYear()}
       </footer>
 
       </div>
