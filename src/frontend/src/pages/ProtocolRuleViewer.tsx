@@ -300,7 +300,7 @@ export const ProtocolRuleViewer = () => {
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 24, borderBottom: `1px solid ${T.border}` }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 600, color: T.text, margin: 0, letterSpacing: '-0.01em' }}>Protocol Rules</h1>
+
           <p style={{ fontSize: '13px', color: T.sub, margin: '8px 0 0 0' }}>
             <strong style={{ color: T.text, fontWeight: 500 }}>{approvedCount} active</strong> rules · {pendingCount} pending review
           </p>

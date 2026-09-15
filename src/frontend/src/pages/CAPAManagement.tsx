@@ -26,11 +26,28 @@ const T = {
   amberBg:  '#FFF8E6',
 };
 
+<<<<<<< HEAD
 // ── Status config ──────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; bg: string; color: string; icon: React.ReactNode }> = {
   approved: { label: 'Approved',      bg: T.greenBg, color: '#137333', icon: <CheckCircle size={10} /> },
   draft:    { label: 'Pending Review', bg: T.amberBg, color: '#B26B00', icon: <Clock size={10} /> },
   rejected: { label: 'Rejected',      bg: T.redBg,   color: '#C5221F', icon: <X size={10} /> },
+=======
+// ─── Badge Animator ────────────────────────────────────────────────────────────
+// ─── Badge Animator ────────────────────────────────────────────────────────────
+const AnimatedBadge: React.FC<{ count: number; bg: string; color: string }> = ({ count, bg, color }) => {
+  return (
+    <motion.span
+      key={count}
+      initial={{ scale: 1.3 }}
+      animate={{ scale: 1.0 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+      style={{ width: 18, height: 18, borderRadius: '50%', background: bg, color: color, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      {count}
+    </motion.span>
+  );
+>>>>>>> 495a7266e600bca93a2d0b3cc5eefadb12296214
 };
 const getStatus = (s: string) => statusConfig[s?.toLowerCase()] ?? statusConfig['draft'];
 

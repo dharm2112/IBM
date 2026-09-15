@@ -105,7 +105,7 @@ export const DeviationCenter = () => {
     >
       {/* Header Section */}
       <div style={{ paddingBottom: 24, borderBottom: `1px solid ${T.border}` }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 600, color: T.text, margin: 0, letterSpacing: '-0.01em' }}>Protocol Deviations</h1>
+
         <p style={{ fontSize: '13px', color: T.sub, margin: '8px 0 0 0' }}>
           <strong style={{ color: T.text, fontWeight: 500 }}>{totalDevs} detected deviations.</strong> Review deviations detected by approved protocol rules.
         </p>

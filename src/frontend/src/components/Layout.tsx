@@ -112,7 +112,7 @@ const Layout = () => {
     '/dashboard/audit':          'Audit Trail',
   };
 
-  const pageTitle = crumbs[location.pathname] ?? 'Clinical Ops';
+  const pageTitle = crumbs[location.pathname] ?? 'TrialGuard';
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: T.bg, color: T.text, overflow: 'hidden' }}>
@@ -140,7 +140,7 @@ const Layout = () => {
             <img src="/logo.svg" alt="TrialGuard Logo" style={{ height: 32, width: 'auto', transform: 'scale(1.15)', transformOrigin: 'left center' }} />
             <div style={{ fontSize: '14px', fontWeight: 500, color: '#1D1D1F' }}>TrialGuard</div>
           </div>
-          <div style={{ fontSize: '11px', color: '#6E6E73', paddingLeft: 42 }}>Clinical Ops</div>
+
         </div>
 
         {/* Nav */}
