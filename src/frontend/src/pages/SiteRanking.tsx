@@ -149,7 +149,7 @@ export const SiteRanking = () => {
         data={filteredSites} 
         columns={columns} 
         keyField="site_id"
-        onRowClick={(site: Site) => navigate(`/sites/${site.site_id}`)}
+        onRowClick={(site: Site) => navigate(`/dashboard/sites/${site.site_id}`)}
       />
     </div>
   );

@@ -188,14 +188,14 @@ export const DeviationCenter = () => {
             <div className="grid grid-cols-2 gap-4">
               <div 
                 className="p-4 bg-white rounded-lg border border-base-border shadow-sm cursor-pointer hover:border-base-ink transition-colors group"
-                onClick={() => navigate(`/sites/${selectedDeviation.site_id}`)}
+                onClick={() => navigate(`/dashboard/sites/${selectedDeviation.site_id}`)}
               >
                 <span className="text-xs text-base-muted uppercase tracking-wider block mb-1 group-hover:text-base-ink transition-colors">Site</span>
                 <span className="font-medium text-sm text-base-ink">{selectedDeviation.site_id}</span>
               </div>
               <div 
                 className="p-4 bg-white rounded-lg border border-base-border shadow-sm cursor-pointer hover:border-base-ink transition-colors group"
-                onClick={() => navigate(`/patients/${selectedDeviation.patient_id}`)}
+                onClick={() => navigate(`/dashboard/patients/${selectedDeviation.patient_id}`)}
               >
                 <span className="text-xs text-base-muted uppercase tracking-wider block mb-1 group-hover:text-base-ink transition-colors">Patient</span>
                 <span className="font-medium text-sm text-base-ink">{selectedDeviation.patient_id}</span>
@@ -234,7 +234,7 @@ export const DeviationCenter = () => {
               <button 
                 onClick={() => {
                   setSelectedDeviation(null);
-                  navigate('/capa');
+                  navigate('/dashboard/capa');
                 }}
                 className="w-full py-3 bg-base-ink hover:bg-black text-white text-sm font-medium rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-base-ink"
               >

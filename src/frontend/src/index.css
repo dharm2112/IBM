@@ -1,32 +1,45 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, "Segoe UI", sans-serif;
-  
-  --color-base-bg: #F7F8FA;
-  --color-base-ink: #111827;
-  --color-base-secondary: #667085;
-  --color-base-muted: #98A2B3;
-  --color-base-border: #E5E7EB;
-  --color-base-card: #FFFFFF;
+  --font-sans: Inter, -apple-system, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', sans-serif;
 
-  --color-risk-low: #10B981; /* Green */
-  --color-risk-medium: #F59E0B; /* Amber */
-  --color-risk-high: #EF4444; /* Red */
-  --color-risk-critical: #991B1B; /* Deep Red */
-  
-  --color-ai-accent: #EEF2FF; /* Subtle blue/purple tinted surface */
-  --color-ai-border: #C7D2FE;
-  --color-ai-text: #4F46E5;
+  /* ── Light theme tokens (dashboard) ─────────── */
+  --color-base-bg:        #f8f9fb;
+  --color-base-ink:       #111827;
+  --color-base-secondary: #6b7280;
+  --color-base-muted:     #9ca3af;
+  --color-base-border:    #e5e7eb;
+  --color-base-card:      #ffffff;
+
+  /* ── Risk colors ─────────────────────────────── */
+  --color-risk-low:      #10B981;
+  --color-risk-medium:   #F59E0B;
+  --color-risk-high:     #EF4444;
+  --color-risk-critical: #991B1B;
+
+  /* ── AI accent ───────────────────────────────── */
+  --color-ai-accent: rgba(99,102,241,0.08);
+  --color-ai-border: rgba(99,102,241,0.2);
+  --color-ai-text:   #6366f1;
 }
 
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
 body {
-  background-color: var(--color-base-bg);
-  color: var(--color-base-ink);
+  background-color: #f8f9fb;
+  color: #111827;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
   padding: 0;
 }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: #d1d5db; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover  { background: #9ca3af; }

@@ -1,11 +1,131 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence, useInView } from 'motion/react';
 import { api } from '../api/client';
 import type { Site, Deviation } from '../api/types';
-import { StatCard, DataTable, RiskBadge, SeverityBadge, DetailDrawer, EvidencePanel } from '../components';
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
-import { RefreshCw, Calculator, ArrowRight } from 'lucide-react';
+import { EvidencePanel } from '../components';
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts';
+import {
+  RefreshCw, Calculator, ArrowRight, AlertTriangle,
+  Building2, Users, Activity, X, ChevronRight, TrendingUp,
+} from 'lucide-react';
 
+// ── Light design tokens ───────────────────────────────────────────────────────
+const T = {
+  bg:          '#f8f9fb',
+  surface:     '#ffffff',
+  surface2:    '#f3f4f6',
+  border:      '#e5e7eb',
+  borderLight: '#f3f4f6',
+  text:        '#111827',
+  sub:         '#6b7280',
+  muted:       '#9ca3af',
+  dim:         '#d1d5db',
+  indigo:      '#6366f1',
+  indigoSub:   'rgba(99,102,241,0.08)',
+  indigoBorder:'rgba(99,102,241,0.18)',
+  green:       '#10b981',
+  amber:       '#f59e0b',
+  red:         '#ef4444',
+};
+
+const ease = [0.22, 1, 0.36, 1];
+
+// ── Animated counter ──────────────────────────────────────────────────────────
+const Counter = ({ to, duration = 1.2 }: { to: number; duration?: number }) => {
+  const [val, setVal] = useState(0);
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true });
+  useEffect(() => {
+    if (!inView) return;
+    let cur = 0;
+    const step = to / (duration * 60);
+    const id = setInterval(() => {
+      cur += step;
+      if (cur >= to) { setVal(to); clearInterval(id); }
+      else setVal(Math.floor(cur));
+    }, 1000 / 60);
+    return () => clearInterval(id);
+  }, [inView, to, duration]);
+  return <span ref={ref}>{val}</span>;
+};
+
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+const KpiCard = ({
+  icon, iconBg, iconColor, title, value, sub, accentBorder, delay = 0,
+}: {
+  icon: React.ReactNode; iconBg: string; iconColor: string;
+  title: string; value: number; sub: string;
+  accentBorder?: string; delay?: number;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay, ease }}
+    whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
+    style={{
+      background: T.surface,
+      border: `1px solid ${accentBorder ?? T.border}`,
+      borderRadius: 14,
+      padding: '20px 22px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 14,
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: T.sub, letterSpacing: '0.01em' }}>{title}</span>
+      <div style={{ padding: 8, borderRadius: 9, background: iconBg, color: iconColor }}>{icon}</div>
+    </div>
+    <div>
+      <div style={{ fontSize: '1.9rem', fontWeight: 800, color: T.text, lineHeight: 1, letterSpacing: '-0.03em' }}>
+        <Counter to={value} />
+      </div>
+      <div style={{ fontSize: '0.72rem', color: T.muted, marginTop: 4 }}>{sub}</div>
+    </div>
+  </motion.div>
+);
+
+// ── Card wrapper ──────────────────────────────────────────────────────────────
+const Card = ({ children, style = {}, delay = 0 }: { children: React.ReactNode; style?: React.CSSProperties; delay?: number }) => {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-40px' });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 18 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, delay, ease }}
+      style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, ...style }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+// ── Colors by severity / risk ─────────────────────────────────────────────────
+const sevColor: Record<string, string> = {
+  CRITICAL: T.red, MAJOR: T.amber, MINOR: T.indigo,
+};
+const riskColor: Record<string, string> = {
+  HIGH: T.red, MEDIUM: T.amber, LOW: T.green,
+};
+
+// ── Custom chart tooltip ──────────────────────────────────────────────────────
+const LightTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: '8px 14px', fontSize: '0.78rem', color: T.text, boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}>
+      <div style={{ color: T.muted, marginBottom: 3 }}>{label}</div>
+      <div style={{ fontWeight: 700, color: T.indigo }}>{payload[0].value} deviations</div>
+    </div>
+  );
+};
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 export const ExecutiveDashboard = () => {
   const navigate = useNavigate();
   const [sites, setSites] = useState<Site[]>([]);
@@ -17,268 +137,361 @@ export const ExecutiveDashboard = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [fetchedSites, fetchedDeviations] = await Promise.all([
-        api.getSites(),
-        api.getDeviations()
-      ]);
-      setSites(fetchedSites);
-      setDeviations(fetchedDeviations);
-    } catch (error) {
-      console.error("Failed to fetch dashboard data", error);
-    } finally {
-      setIsLoading(false);
-    }
+      const [s, d] = await Promise.all([api.getSites(), api.getDeviations()]);
+      setSites(s); setDeviations(d);
+    } catch (e) { console.error(e); }
+    finally { setIsLoading(false); }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleRecalculate = async () => {
     setIsRecalculating(true);
-    try {
-      await api.recalculateRisk();
-      await fetchData();
-    } finally {
-      setIsRecalculating(false);
-    }
+    try { await api.recalculateRisk(); await fetchData(); }
+    finally { setIsRecalculating(false); }
   };
 
-  if (isLoading && sites.length === 0) {
-    return <div className="flex items-center justify-center h-64 text-base-secondary">Loading dashboard data...</div>;
-  }
+  const highRisk  = sites.filter(s => s.risk_level === 'HIGH').length;
+  const majorDevs = deviations.filter(d => d.severity === 'MAJOR' || d.severity === 'CRITICAL').length;
+  const topSites  = [...sites].sort((a, b) => b.risk_score - a.risk_score).slice(0, 5);
 
-  const highRiskSites = sites.filter(s => s.risk_level === 'HIGH').length;
-  const majorDeviations = deviations.filter(d => d.severity === 'MAJOR' || d.severity === 'CRITICAL').length;
-  const topSites = [...sites].sort((a, b) => b.risk_score - a.risk_score).slice(0, 5);
-
-  const riskDistribution = [
-    { name: 'LOW', value: sites.filter(s => s.risk_level === 'LOW').length, color: '#10B981' },
-    { name: 'MEDIUM', value: sites.filter(s => s.risk_level === 'MEDIUM').length, color: '#F59E0B' },
-    { name: 'HIGH', value: sites.filter(s => s.risk_level === 'HIGH').length, color: '#EF4444' },
+  const riskDist = [
+    { name: 'LOW',    value: sites.filter(s => s.risk_level === 'LOW').length,    color: T.green },
+    { name: 'MEDIUM', value: sites.filter(s => s.risk_level === 'MEDIUM').length, color: T.amber },
+    { name: 'HIGH',   value: sites.filter(s => s.risk_level === 'HIGH').length,   color: T.red   },
   ];
 
   const trendData = [
-    { name: 'Week 1', deviations: 12 },
-    { name: 'Week 2', deviations: 18 },
-    { name: 'Week 3', deviations: 15 },
-    { name: 'Week 4', deviations: deviations.length },
+    { name: 'Wk 1', deviations: 12 },
+    { name: 'Wk 2', deviations: 18 },
+    { name: 'Wk 3', deviations: 15 },
+    { name: 'Wk 4', deviations: deviations.length || 21 },
   ];
 
-  const deviationColumns = [
-    { key: 'id', header: 'Deviation ID', render: (d: Deviation) => <span className="font-mono text-xs">{d.deviation_id}</span> },
-    { key: 'site', header: 'Site', render: (d: Deviation) => d.site_id },
-    { key: 'patient', header: 'Patient', render: (d: Deviation) => d.patient_id },
-    { key: 'rule', header: 'Rule', render: (d: Deviation) => d.rule_id },
-    { key: 'category', header: 'Category', render: (d: Deviation) => d.category },
-    { key: 'severity', header: 'Severity', render: (d: Deviation) => <SeverityBadge level={d.severity} /> },
-    { key: 'status', header: 'Status', render: (d: Deviation) => <span className="text-xs font-medium px-2 py-1 bg-slate-100 rounded">{d.status}</span> },
-  ];
+  if (isLoading && sites.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 14 }}>
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+          <RefreshCw size={22} color={T.indigo} />
+        </motion.div>
+        <span style={{ color: T.muted, fontSize: '0.88rem' }}>Loading dashboard…</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── Header ── */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease }}
+        style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}
+      >
         <div>
-          <h1 className="text-3xl font-semibold text-base-ink">Executive Dashboard</h1>
-          <p className="text-sm text-base-secondary mt-2">Clinical trial monitoring overview.</p>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.025em', color: T.text, margin: 0 }}>
+            Executive Dashboard
+          </h1>
+          <p style={{ fontSize: '0.8rem', color: T.muted, margin: '5px 0 0' }}>
+            Clinical trial monitoring overview · CT-801-ONC
+          </p>
         </div>
-        <div className="flex flex-col items-end gap-3">
-          <span className="text-xs text-base-muted">Last updated 2 min ago</span>
-          <div className="flex items-center space-x-3">
-            <button 
-              onClick={fetchData} 
-              disabled={isLoading}
-              className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-base-ink bg-white border border-base-border hover:bg-slate-50 rounded-md transition-colors disabled:opacity-50"
-            >
-              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-              <span>Refresh</span>
-            </button>
-            <button 
-              onClick={handleRecalculate}
-              disabled={isRecalculating}
-              className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-base-ink hover:bg-black rounded-md transition-colors disabled:opacity-50"
-            >
-              <Calculator size={16} className={isRecalculating ? "animate-spin" : ""} />
-              <span>Recalculate Risk</span>
-            </button>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '0.7rem', color: T.muted }}>Updated 2 min ago</span>
+          <motion.button
+            onClick={fetchData} disabled={isLoading}
+            whileHover={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+            whileTap={{ scale: 0.97 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 15px', borderRadius: 9, border: `1px solid ${T.border}`, background: T.surface, color: T.sub, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+          >
+            <RefreshCw size={13} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
+            Refresh
+          </motion.button>
+          <motion.button
+            onClick={handleRecalculate} disabled={isRecalculating}
+            whileHover={{ boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}
+            whileTap={{ scale: 0.97 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#6366f1,#a855f7)', color: '#fff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            <Calculator size={13} style={{ animation: isRecalculating ? 'spin 1s linear infinite' : 'none' }} />
+            Recalculate Risk
+          </motion.button>
         </div>
+      </motion.div>
+
+      {/* ── Alert banner ── */}
+      <AnimatePresence>
+        {highRisk > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.35, ease }}
+            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}
+          >
+            <div style={{ padding: '5px 10px', background: '#fee2e2', borderRadius: 7, display: 'flex', alignItems: 'center', gap: 5, color: T.red, fontSize: '0.7rem', fontWeight: 700, flexShrink: 0 }}>
+              <AlertTriangle size={13} /> ATTENTION
+            </div>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#374151' }}>
+              <strong style={{ color: T.text }}>{highRisk} site{highRisk > 1 ? 's' : ''}</strong> require{highRisk === 1 ? 's' : ''} investigation due to elevated risk scores.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── KPIs ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+        <KpiCard icon={<Building2 size={15} />}    iconBg="rgba(99,102,241,0.08)"  iconColor={T.indigo} title="Total Sites"           value={sites.length}       sub="Across the trial"               delay={0}    />
+        <KpiCard icon={<Users size={15} />}         iconBg="rgba(16,185,129,0.08)" iconColor={T.green}  title="Active Patients"      value={100}                sub="Currently enrolled"             delay={0.07} />
+        <KpiCard icon={<Activity size={15} />}      iconBg="rgba(245,158,11,0.08)" iconColor={T.amber}  title="Protocol Deviations"  value={deviations.length} sub={`${majorDevs} major / critical`}  delay={0.14} />
+        <KpiCard icon={<AlertTriangle size={15} />} iconBg="rgba(239,68,68,0.08)"  iconColor={T.red}    title="High-Risk Sites"      value={highRisk}           sub="Requires immediate action"      delay={0.21} accentBorder="#fecaca" />
       </div>
 
-      {/* Trial Health Banner */}
-      {highRiskSites > 0 && (
-        <div className="bg-risk-high/10 border border-risk-high/20 rounded-lg p-4 flex items-start space-x-3">
-          <div className="p-2 bg-risk-high rounded-full text-white shrink-0">
-            <span className="font-bold text-xs uppercase">Attention</span>
-          </div>
-          <div>
-            <h3 className="font-semibold text-risk-high">Trial Health</h3>
-            <p className="text-sm text-base-ink mt-0.5">{highRiskSites} site{highRiskSites > 1 ? 's require' : ' requires'} investigation due to elevated risk scores.</p>
-          </div>
-        </div>
-      )}
+      {/* ── Charts ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 14 }}>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Sites" value={sites.length} subtitle="Across the trial" />
-        <StatCard title="Patients" value={100} subtitle="Active participants" />
-        <StatCard title="Protocol Deviations" value={deviations.length} subtitle={`${majorDeviations} major/critical`} />
-        <StatCard title="High-Risk Sites" value={highRiskSites} subtitle="Requires attention" trend="up" className="border-risk-high/30" />
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-base-card border border-base-border rounded-lg p-6 flex flex-col">
-          <h3 className="text-lg font-semibold mb-6">Risk Distribution</h3>
-          <div className="flex-1 flex items-center justify-center relative min-h-[200px]">
+        {/* Donut */}
+        <Card style={{ padding: 22 }} delay={0.05}>
+          <div style={{ fontSize: '0.83rem', fontWeight: 700, color: T.text, marginBottom: 18 }}>Risk Distribution</div>
+          <div style={{ position: 'relative', height: 190 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={riskDistribution} innerRadius={60} outerRadius={80} dataKey="value" stroke="none">
-                  {riskDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
+                <Pie data={riskDist} innerRadius={54} outerRadius={74} dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
+                  {riskDist.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Pie>
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 9, fontSize: '0.75rem', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
               </PieChart>
             </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-3xl font-semibold text-base-ink">{sites.length}</span>
-              <span className="text-xs text-base-secondary">Sites</span>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+              <span style={{ fontSize: '1.7rem', fontWeight: 800, color: T.text, lineHeight: 1 }}>{sites.length}</span>
+              <span style={{ fontSize: '0.67rem', color: T.muted, marginTop: 2 }}>Sites</span>
             </div>
           </div>
-          <div className="flex justify-center space-x-4 mt-4">
-            {riskDistribution.map(d => (
-              <div key={d.name} className="flex items-center space-x-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }}></div>
-                <span className="text-xs font-medium text-base-secondary">{d.name}</span>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 10 }}>
+            {riskDist.map(d => (
+              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: d.color }} />
+                <span style={{ fontSize: '0.68rem', color: T.sub, fontWeight: 600 }}>{d.name}</span>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-base-card border border-base-border rounded-lg p-6 lg:col-span-2 flex flex-col">
-          <h3 className="text-lg font-semibold mb-6">Deviation Trend</h3>
-          <div className="flex-1 min-h-[200px]">
+        {/* Line chart */}
+        <Card style={{ padding: 22 }} delay={0.1}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <div style={{ fontSize: '0.83rem', fontWeight: 700, color: T.text }}>Deviation Trend</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.7rem' }}>
+              <TrendingUp size={12} color={T.indigo} />
+              <span style={{ color: T.indigo, fontWeight: 600 }}>+24% this week</span>
+            </div>
+          </div>
+          <div style={{ height: 190 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#667085' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: '#667085' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Line type="monotone" dataKey="deviations" stroke="#111827" strokeWidth={3} dot={{ r: 4, fill: '#111827', strokeWidth: 2, stroke: '#fff' }} />
+              <LineChart data={trendData} margin={{ top: 4, right: 8, left: -26, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={T.border} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
+                <Tooltip content={<LightTooltip />} />
+                <defs>
+                  <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%"   stopColor="#6366f1" />
+                    <stop offset="100%" stopColor="#a855f7" />
+                  </linearGradient>
+                </defs>
+                <Line
+                  type="monotone" dataKey="deviations"
+                  stroke="url(#lineGrad)" strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6, fill: '#6366f1', strokeWidth: 0 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
+
       </div>
 
-      {/* Top Risk Sites */}
-      <div className="bg-base-card border border-base-border rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Top Risk Sites</h3>
-        <div className="space-y-4">
-          {topSites.map((site) => (
-            <div key={site.site_id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg group transition-colors">
-              <div className="flex items-center space-x-6 flex-1">
-                <div className="w-24">
-                  <span className="font-mono text-xs text-base-secondary">{site.site_id}</span>
-                </div>
-                <div className="flex-1 font-medium">{site.site_name}</div>
-                <div className="w-32 flex items-center space-x-2">
-                  <span className="text-sm font-semibold w-8">{site.risk_score}</span>
-                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full ${site.risk_level === 'HIGH' ? 'bg-risk-high' : site.risk_level === 'MEDIUM' ? 'bg-risk-medium' : 'bg-risk-low'}`}
-                      style={{ width: `${site.risk_score}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="w-24">
-                  <RiskBadge level={site.risk_level} />
-                </div>
+      {/* ── Top Risk Sites ── */}
+      <Card style={{ padding: '18px 22px' }} delay={0.15}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ fontSize: '0.83rem', fontWeight: 700, color: T.text }}>Top Risk Sites</div>
+          <motion.button
+            whileHover={{ color: T.indigo }}
+            onClick={() => navigate('/dashboard/sites')}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.74rem', color: T.muted, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+          >
+            View all <ChevronRight size={12} />
+          </motion.button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {topSites.map((site, i) => (
+            <motion.div
+              key={site.site_id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.35, delay: i * 0.06, ease }}
+              onClick={() => navigate(`/dashboard/sites/${site.site_id}`)}
+              whileHover={{ background: T.surface2, x: 2 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '9px 10px', borderRadius: 10, cursor: 'pointer' }}
+            >
+              <span style={{ fontFamily: 'monospace', fontSize: '0.68rem', color: T.muted, width: 64, flexShrink: 0 }}>{site.site_id}</span>
+              <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 500, color: T.text }}>{site.site_name}</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: riskColor[site.risk_level], width: 28, textAlign: 'right', flexShrink: 0 }}>{site.risk_score}</span>
+              <div style={{ width: 90, height: 4, background: T.surface2, borderRadius: 99, overflow: 'hidden', flexShrink: 0 }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${site.risk_score}%` }}
+                  transition={{ duration: 0.7, delay: i * 0.06 + 0.2, ease }}
+                  style={{ height: '100%', background: riskColor[site.risk_level], borderRadius: 99 }}
+                />
               </div>
-              <button 
-                onClick={() => navigate(`/sites/${site.site_id}`)}
-                className="opacity-0 group-hover:opacity-100 p-2 text-base-secondary hover:text-base-ink transition-all"
-              >
-                <ArrowRight size={18} />
-              </button>
-            </div>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: riskColor[site.risk_level], background: `${riskColor[site.risk_level]}15`, padding: '2px 8px', borderRadius: 99, width: 52, textAlign: 'center', flexShrink: 0 }}>
+                {site.risk_level}
+              </span>
+              <ArrowRight size={13} color={T.dim} />
+            </motion.div>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Recent Deviations */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Recent Protocol Deviations</h3>
-        <DataTable 
-          data={deviations.slice(0, 5)} 
-          columns={deviationColumns} 
-          keyField="deviation_id"
-          onRowClick={(dev) => setSelectedDeviation(dev)}
-        />
-      </div>
+      {/* ── Recent Deviations ── */}
+      <Card delay={0.2}>
+        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '0.83rem', fontWeight: 700, color: T.text }}>Recent Protocol Deviations</div>
+          <motion.button
+            whileHover={{ color: T.indigo }}
+            onClick={() => navigate('/dashboard/deviations')}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.74rem', color: T.muted, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+          >
+            View all <ChevronRight size={12} />
+          </motion.button>
+        </div>
 
-      {/* Detail Drawer for Deviation */}
-      <DetailDrawer
-        isOpen={!!selectedDeviation}
-        onClose={() => setSelectedDeviation(null)}
-        title={
-          <div className="flex items-center space-x-3">
-            <span className="font-mono text-sm">{selectedDeviation?.deviation_id}</span>
-            {selectedDeviation && <SeverityBadge level={selectedDeviation.severity} />}
-          </div>
-        }
-      >
+        {/* Table header */}
+        <div style={{ display: 'grid', gridTemplateColumns: '150px 86px 96px 1fr 78px 88px', padding: '9px 22px', borderBottom: `1px solid ${T.borderLight}` }}>
+          {['Deviation ID', 'Site', 'Patient', 'Category', 'Severity', 'Status'].map(h => (
+            <span key={h} style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: T.muted }}>{h}</span>
+          ))}
+        </div>
+
+        {deviations.slice(0, 6).map((dev, i) => (
+          <motion.div
+            key={dev.deviation_id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.05, ease }}
+            onClick={() => setSelectedDeviation(dev)}
+            whileHover={{ background: T.surface2 }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '150px 86px 96px 1fr 78px 88px',
+              padding: '12px 22px',
+              borderBottom: i < 5 ? `1px solid ${T.borderLight}` : 'none',
+              cursor: 'pointer',
+              alignItems: 'center',
+            }}
+          >
+            <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: T.indigo, fontWeight: 600 }}>{dev.deviation_id}</span>
+            <span style={{ fontSize: '0.78rem', color: T.sub }}>{dev.site_id}</span>
+            <span style={{ fontSize: '0.78rem', color: T.sub }}>{dev.patient_id}</span>
+            <span style={{ fontSize: '0.78rem', color: T.text, paddingRight: 10 }}>{dev.category}</span>
+            <span style={{ fontSize: '0.67rem', fontWeight: 700, color: sevColor[dev.severity] ?? T.muted, background: `${sevColor[dev.severity] ?? T.muted}15`, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>
+              {dev.severity}
+            </span>
+            <span style={{ fontSize: '0.67rem', fontWeight: 600, color: T.sub, background: T.surface2, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>
+              {dev.status}
+            </span>
+          </motion.div>
+        ))}
+      </Card>
+
+      {/* ── Detail Drawer ── */}
+      <AnimatePresence>
         {selectedDeviation && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-sm font-semibold text-base-muted uppercase tracking-wider mb-3">Overview</h3>
-              <p className="text-base text-base-ink">{selectedDeviation.description}</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Site</span>
-                <span className="font-medium text-sm">{selectedDeviation.site_id}</span>
+          <>
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedDeviation(null)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(3px)', zIndex: 40 }}
+            />
+            <motion.aside
+              key="drawer"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+              style={{
+                position: 'fixed', top: 0, right: 0, bottom: 0, width: 460,
+                background: T.surface, borderLeft: `1px solid ${T.border}`,
+                zIndex: 50, display: 'flex', flexDirection: 'column',
+                boxShadow: '-16px 0 48px rgba(0,0,0,0.12)',
+              }}
+            >
+              {/* Header */}
+              <div style={{ padding: '18px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: T.indigo, fontWeight: 700 }}>{selectedDeviation.deviation_id}</span>
+                  <span style={{ fontSize: '0.67rem', fontWeight: 700, color: sevColor[selectedDeviation.severity], background: `${sevColor[selectedDeviation.severity]}15`, padding: '3px 10px', borderRadius: 99 }}>
+                    {selectedDeviation.severity}
+                  </span>
+                </div>
+                <motion.button
+                  onClick={() => setSelectedDeviation(null)}
+                  whileHover={{ background: T.surface2, scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', color: T.muted, cursor: 'pointer', display: 'flex' }}
+                >
+                  <X size={17} />
+                </motion.button>
               </div>
-              <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Patient</span>
-                <span className="font-medium text-sm">{selectedDeviation.patient_id}</span>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Rule</span>
-                <span className="font-mono text-sm">{selectedDeviation.rule_id}</span>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Category</span>
-                <span className="font-medium text-sm">{selectedDeviation.category}</span>
-              </div>
-            </div>
 
-            <div className="pt-4">
-              <h3 className="text-sm font-semibold text-base-muted uppercase tracking-wider mb-3">Evidence</h3>
-              <EvidencePanel 
-                expected={selectedDeviation.expected} 
-                actual={selectedDeviation.actual} 
-                severity={selectedDeviation.severity} 
-              />
-            </div>
-            
-            <div className="pt-4">
-              <button 
-                onClick={() => {
-                  setSelectedDeviation(null);
-                  navigate('/capa');
-                }}
-                className="w-full py-2.5 bg-base-ink hover:bg-black text-white text-sm font-medium rounded-md transition-colors"
-              >
-                Generate CAPA
-              </button>
-            </div>
-          </div>
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: 22, display: 'flex', flexDirection: 'column', gap: 22 }}>
+                <div>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: T.muted, marginBottom: 7 }}>Overview</div>
+                  <p style={{ fontSize: '0.85rem', lineHeight: 1.65, color: T.sub, margin: 0 }}>{selectedDeviation.description}</p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {[
+                    { label: 'Site',     value: selectedDeviation.site_id },
+                    { label: 'Patient',  value: selectedDeviation.patient_id },
+                    { label: 'Rule',     value: selectedDeviation.rule_id, mono: true },
+                    { label: 'Category', value: selectedDeviation.category },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 10, padding: '11px 13px' }}>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: T.muted, marginBottom: 4 }}>{m.label}</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: T.text, fontFamily: m.mono ? 'monospace' : 'inherit' }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: T.muted, marginBottom: 9 }}>Evidence</div>
+                  <EvidencePanel expected={selectedDeviation.expected} actual={selectedDeviation.actual} severity={selectedDeviation.severity} />
+                </div>
+
+                <motion.button
+                  whileHover={{ boxShadow: '0 6px 20px rgba(99,102,241,0.35)', scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => { setSelectedDeviation(null); navigate('/dashboard/capa'); }}
+                  style={{ width: '100%', padding: '12px 0', borderRadius: 11, border: 'none', background: 'linear-gradient(135deg,#6366f1,#a855f7)', color: '#fff', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Generate CAPA →
+                </motion.button>
+              </div>
+            </motion.aside>
+          </>
         )}
-      </DetailDrawer>
+      </AnimatePresence>
 
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
