@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../api/mock';
+import { api } from '../api/client';
 import type { Capa, Deviation } from '../api/types';
 import { SeverityBadge, AIBanner, ApprovalActions } from '../components';
 import { Sparkles, Loader2, Plus, ChevronDown, ChevronRight } from 'lucide-react';

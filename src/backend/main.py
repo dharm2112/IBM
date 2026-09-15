@@ -37,8 +37,22 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Load .env file (if present) before any modules read os.environ
-load_dotenv()
+# Load .env from multiple candidate locations — first file found wins.
+# Search order: project root → src/ → scripts/
+# This allows the .env to live anywhere common developers place it.
+import pathlib
+_BASE = pathlib.Path(__file__).resolve().parents[2]  # d:\hackthon\IBM
+for _env_candidate in [
+    _BASE / ".env",
+    _BASE / "src" / ".env",
+    _BASE / "scripts" / ".env",
+]:
+    if _env_candidate.exists() and _env_candidate.stat().st_size > 0:
+        load_dotenv(dotenv_path=str(_env_candidate), override=True)
+        break
+else:
+    # Fall back to default search (handles venv/docker scenarios)
+    load_dotenv()
 
 from src.backend.error_handlers import register_error_handlers
 from src.backend.routers.ai_routes import router as ai_router

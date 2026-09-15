@@ -58,6 +58,10 @@ class Visit:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+    def get(self, key: str, default: Any = None) -> Any:
+        """Provide mapping-style access for evaluators that also accept dict records."""
+        return getattr(self, key, default)
+
 
 @dataclass
 class DosingEvent:

@@ -43,6 +43,7 @@ engine = create_engine(
     _DATABASE_URL,
     connect_args=_connect_args,
     echo=False,
+    pool_pre_ping=True, # Prevent connection drops with pooled Neon DB connections
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
