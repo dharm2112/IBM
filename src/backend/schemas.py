@@ -208,6 +208,7 @@ class GenerateCapaResponse(BaseModel):
     status is always "draft" — the CAPA is NEVER auto-approved.
     """
 
+    capa_id: str | None = None
     deviation_id: str
     status: str = "draft"
     human_review_required: bool = True

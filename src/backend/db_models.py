@@ -181,3 +181,84 @@ class SiteRiskScoreRecord(Base):
             "top_risk_drivers": json.loads(self.top_risk_drivers or "[]"),
             "components": json.loads(self.components or "{}"),
         }
+
+
+# Generated synthetic source data is run-scoped.  These tables are storage
+# projections of src.data_generator dataclasses; they do not make decisions.
+class SiteRecord(Base):
+    __tablename__ = "sites"
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+    site_id = Column(String(64), nullable=False, index=True)
+    site_name = Column(String(255), nullable=False)
+    country = Column(String(64)); city = Column(String(128)); investigator = Column(String(255))
+    activation_date = Column(String(32)); patient_count = Column(Integer); status = Column(String(32))
+
+
+class PatientRecord(Base):
+    __tablename__ = "patients"
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+    patient_id = Column(String(64), nullable=False, index=True); site_id = Column(String(64), nullable=False, index=True)
+    patient_code = Column(String(64)); enrollment_date = Column(String(32)); arm = Column(String(64)); status = Column(String(32))
+    date_of_birth = Column(String(32)); sex = Column(String(16)); baseline_hba1c = Column(Float); baseline_egfr = Column(Float)
+
+
+class VisitRecord(Base):
+    __tablename__ = "visits"
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+    visit_id = Column(String(64), nullable=False, index=True); patient_id = Column(String(64), nullable=False, index=True); site_id = Column(String(64), nullable=False)
+    visit_number = Column(Integer); visit_type = Column(String(32)); scheduled_date = Column(String(32)); actual_date = Column(String(32)); status = Column(String(32)); data_entry_date = Column(String(64))
+
+
+class LabRecord(Base):
+    __tablename__ = "labs"
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+    lab_id = Column(String(64), nullable=False); visit_id = Column(String(64), nullable=False, index=True); patient_id = Column(String(64), nullable=False, index=True)
+    test_code = Column(String(64)); test_name = Column(String(128)); result_value = Column(Float); result_unit = Column(String(32)); result_date = Column(String(32))
+
+
+class DoseRecord(Base):
+    __tablename__ = "doses"
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+    dose_id = Column(String(64), nullable=False); visit_id = Column(String(64), nullable=False, index=True); patient_id = Column(String(64), nullable=False, index=True)
+    drug_code = Column(String(64)); scheduled_dose = Column(Float); actual_dose = Column(Float); dose_unit = Column(String(32)); administration_date = Column(String(64)); route = Column(String(32)); compliance_pct = Column(Float)
+
+
+class MedicationRecord(Base):
+    __tablename__ = "medications"
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String(64), ForeignKey("engine_runs.run_id"), nullable=False, index=True)
+    med_id = Column(String(64), nullable=False); patient_id = Column(String(64), nullable=False, index=True)
+    drug_name = Column(String(255)); drug_class = Column(String(128)); start_date = Column(String(32)); end_date = Column(String(32)); dose = Column(String(64)); indication = Column(String(255))
+
+
+class CapaRecord(Base):
+    __tablename__ = "capas"
+    id = Column(Integer, primary_key=True); capa_id = Column(String(64), unique=True, nullable=False, index=True)
+    deviation_id = Column(String(64), nullable=False, index=True); site_id = Column(String(64)); patient_id = Column(String(64))
+    root_cause_analysis = Column(Text); immediate_actions = Column(Text); preventive_actions = Column(Text); timeline = Column(Text); effectiveness_check = Column(Text); full_draft = Column(Text)
+    status = Column(String(32), nullable=False, default="draft"); human_review_required = Column(Boolean, nullable=False, default=True)
+    provider = Column(String(64), default="watsonx.ai"); model_id = Column(String(128)); created_at = Column(DateTime, default=datetime.utcnow); updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ProtocolRuleRecord(Base):
+    __tablename__ = "protocol_rules_review"
+    id = Column(Integer, primary_key=True); rule_id = Column(String(128), unique=True, nullable=False, index=True)
+    category = Column(String(64)); description = Column(Text); condition = Column(Text); expected_value = Column(Text); allowed_range = Column(Text); unit = Column(String(64)); visit = Column(String(64)); severity_hint = Column(String(64)); source_text = Column(Text); confidence = Column(String(32))
+    status = Column(String(32), nullable=False, default="pending"); created_at = Column(DateTime, default=datetime.utcnow); updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AuditLogRecord(Base):
+    __tablename__ = "audit_logs"
+    id = Column(Integer, primary_key=True); event_id = Column(String(64), unique=True, nullable=False, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False); event_type = Column(String(64), nullable=False); entity_type = Column(String(64), nullable=False); entity_id = Column(String(128), nullable=False)
+    previous_status = Column(String(32)); new_status = Column(String(32)); source = Column(String(64)); details = Column(Text)
+
+
+def add_audit_event(db, event_type: str, entity_type: str, entity_id: str, *, previous_status=None, new_status=None, source="system", details=None):
+    import uuid
+    db.add(AuditLogRecord(event_id=f"AUD-{uuid.uuid4().hex[:12].upper()}", event_type=event_type, entity_type=entity_type, entity_id=entity_id, previous_status=previous_status, new_status=new_status, source=source, details=details))

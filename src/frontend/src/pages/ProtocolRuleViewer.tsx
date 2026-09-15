@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../api/mock';
+import { api } from '../api/client';
 import type { ProtocolRule } from '../api/types';
 import { SeverityBadge, AIBanner, ApprovalActions, DetailDrawer, Folder } from '../components';
 import { Upload, Search, CheckCircle, Clock, Loader2, Sparkles } from 'lucide-react';
@@ -205,13 +205,13 @@ export const ProtocolRuleViewer = () => {
   };
 
   const handleApprove = async (ruleId: string) => {
-    await api.approveRule(ruleId);
+    await api.approveProtocolRule(ruleId);
     await fetchData();
     setSelectedRule(null);
   };
 
   const handleReject = async (ruleId: string) => {
-    await api.rejectRule(ruleId);
+    await api.rejectProtocolRule(ruleId);
     await fetchData();
     setSelectedRule(null);
   };

@@ -35,6 +35,9 @@ _DATABASE_URL = os.environ.get(
     "sqlite:///./trialguard.db",   # default: file-backed SQLite next to cwd
 )
 
+if "DATABASE_URL" in os.environ and not _DATABASE_URL.startswith(("sqlite://", "postgresql://", "postgresql+")):
+    raise RuntimeError("DATABASE_URL must use sqlite:// or postgresql:// / postgresql+asyncpg://")
+
 # For SQLite we must pass check_same_thread=False so that the same connection
 # can be used from different request threads in FastAPI's thread-pool.
 _connect_args = {"check_same_thread": False} if _DATABASE_URL.startswith("sqlite") else {}

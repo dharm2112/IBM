@@ -36,7 +36,11 @@ from sqlalchemy.orm import Session
 
 from src.data_generator import DatasetBundle, GeneratorConfig, generate_dataset
 from src.rule_engine import TrialGuardRuleEngine, DetectedDeviation, SiteRiskScore, score_all_sites
-from src.backend.db_models import DetectedDeviationRecord, EngineRun, SiteRiskScoreRecord
+from src.backend.db_models import (
+    DetectedDeviationRecord, EngineRun, SiteRiskScoreRecord, SiteRecord,
+    PatientRecord, VisitRecord, LabRecord, DoseRecord, MedicationRecord,
+    add_audit_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,13 +164,42 @@ def run_engine_pipeline(
         # Pass scenarios_path=None so generate_dataset searches for the default
         # deviation_scenarios.json. If it is not found the injector is skipped
         # automatically — no fake path needed (and /dev/null doesn't exist on Windows).
-        bundle: DatasetBundle = generate_dataset(config, scenarios_path=None)
+        scenarios_path = None
+        if num_sites < 10 or patients_per_site < 10:
+            import pathlib
+            scenarios_path = pathlib.Path(__file__).resolve().parent / "_no_scenarios.json"
+        bundle: DatasetBundle = generate_dataset(config, scenarios_path=scenarios_path)
 
         logger.info(
             "run_engine_pipeline | run_id=%s | dataset generated | summary=%s",
             run_id,
             bundle.summary(),
         )
+
+        # Persist the generated, de-identified source records under this run.
+        # They remain a projection of the generator's dataclasses, not a second
+        # clinical data model or source of rule-engine truth.
+        db.add_all([SiteRecord(run_id=run_id, site_id=s.site_id, site_name=s.site_name,
+            country=s.country, city=s.city, investigator=s.investigator,
+            activation_date=s.activation_date, patient_count=s.patient_count, status=s.status) for s in bundle.sites])
+        db.add_all([PatientRecord(run_id=run_id, patient_id=p.patient_id, site_id=p.site_id,
+            patient_code=p.patient_code, enrollment_date=p.enrollment_date, arm=p.arm,
+            status=p.status, date_of_birth=p.date_of_birth, sex=p.sex,
+            baseline_hba1c=p.baseline_hba1c, baseline_egfr=p.baseline_egfr) for p in bundle.patients])
+        db.add_all([VisitRecord(run_id=run_id, visit_id=v.visit_id, patient_id=v.patient_id,
+            site_id=v.site_id, visit_number=v.visit_number, visit_type=v.visit_type,
+            scheduled_date=v.scheduled_date, actual_date=v.actual_date, status=v.status,
+            data_entry_date=v.data_entry_date) for v in bundle.visits])
+        db.add_all([LabRecord(run_id=run_id, lab_id=l.lab_id, visit_id=l.visit_id,
+            patient_id=l.patient_id, test_code=l.test_code, test_name=l.test_name,
+            result_value=l.result_value, result_unit=l.result_unit, result_date=l.result_date) for l in bundle.lab_results])
+        db.add_all([DoseRecord(run_id=run_id, dose_id=d.dose_id, visit_id=d.visit_id,
+            patient_id=d.patient_id, drug_code=d.drug_code, scheduled_dose=d.scheduled_dose,
+            actual_dose=d.actual_dose, dose_unit=d.dose_unit,
+            administration_date=d.administration_date, route=d.route, compliance_pct=d.compliance_pct) for d in bundle.dosing_events])
+        db.add_all([MedicationRecord(run_id=run_id, med_id=m.med_id, patient_id=m.patient_id,
+            drug_name=m.drug_name, drug_class=m.drug_class, start_date=m.start_date,
+            end_date=m.end_date, dose=m.dose, indication=m.indication) for m in bundle.medications])
 
         # ── Step 2: Rule engine evaluation ────────────────────────────────
         engine = TrialGuardRuleEngine()
@@ -243,6 +276,7 @@ def run_engine_pipeline(
         run_record.deviations_detected = len(deviations)
         run_record.sites_scored = len(risk_scores)
         run_record.high_risk_sites = sum(1 for s in risk_scores if s.risk_level == "HIGH")
+        add_audit_event(db, "engine_run", "EngineRun", run_id, new_status="completed", details="Synthetic dataset generated and deterministic outputs persisted")
         db.commit()
 
         # ── Step 7: Build response ─────────────────────────────────────────

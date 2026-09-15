@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { api } from '../api/mock';
+import { api } from '../api/client';
 import type { AuditLog } from '../api/types';
 import { RefreshCw, Shield, Search, Terminal, User, Sparkles } from 'lucide-react';
 
@@ -86,7 +86,7 @@ export const AuditTrail = () => {
       const fetched = await api.getAuditLogs();
       setLogs((prev) => {
         const prevIds = new Set(prev.map((l) => l.audit_id));
-        const newIds = new Set(fetched.filter((l) => !prevIds.has(l.audit_id)).map((l) => l.audit_id));
+        const newIds = new Set<string>(fetched.filter((l: AuditLog) => !prevIds.has(l.audit_id)).map((l: AuditLog) => l.audit_id));
         if (newIds.size > 0) {
           setNewLogIds(newIds);
           setTimeout(() => setNewLogIds(new Set()), 3000);

@@ -32,9 +32,12 @@ from __future__ import annotations
 
 import io
 import logging
+import json
+import uuid
 
 import pypdf
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
+from sqlalchemy.orm import Session
 
 from src.ai.capa_generator import CapaGenerator, DeviationDetail
 from src.ai.protocol_extractor import ProtocolExtractor
@@ -45,6 +48,8 @@ from src.ai.risk_explainer import (
 )
 from src.ai.watsonx_service import WatsonxService
 from src.backend.dependencies import get_watsonx
+from src.backend.database import get_db
+from src.backend.db_models import CapaRecord, ProtocolRuleRecord, add_audit_event
 from src.backend.schemas import (
     ExtractProtocolRequest,
     ExtractProtocolResponse,
@@ -55,6 +60,7 @@ from src.backend.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+MAX_PROTOCOL_PDF_BYTES = 5 * 1024 * 1024
 
 router = APIRouter(prefix="/ai", tags=["AI — IBM watsonx.ai"])
 
@@ -80,6 +86,7 @@ router = APIRouter(prefix="/ai", tags=["AI — IBM watsonx.ai"])
 def extract_protocol(
     body: ExtractProtocolRequest,
     svc: WatsonxService = Depends(get_watsonx),
+    db: Session = Depends(get_db),
 ) -> ExtractProtocolResponse:
     """
     Extract structured protocol rules from *body.protocol_text*.
@@ -100,6 +107,9 @@ def extract_protocol(
     rules_out = result.to_dict()["rules"]
     for rule in rules_out:
         rule["status"] = "pending"
+        _persist_rule(db, rule)
+    add_audit_event(db, "protocol_extraction", "ProtocolRule", "batch", source="watsonx.ai", details=f"{len(rules_out)} rules extracted")
+    db.commit()
 
     logger.info(
         "POST /ai/extract-protocol complete | rules=%d | warnings=%d",
@@ -133,6 +143,7 @@ def extract_protocol(
 def extract_protocol_pdf(
     file: UploadFile = File(...),
     svc: WatsonxService = Depends(get_watsonx),
+    db: Session = Depends(get_db),
 ) -> ExtractProtocolResponse:
     """
     Extract structured protocol rules from an uploaded PDF.
@@ -145,7 +156,9 @@ def extract_protocol_pdf(
         raise HTTPException(status_code=400, detail="Uploaded file must be a PDF")
 
     try:
-        content = file.file.read()
+        content = file.file.read(MAX_PROTOCOL_PDF_BYTES + 1)
+        if len(content) > MAX_PROTOCOL_PDF_BYTES:
+            raise HTTPException(status_code=413, detail="PDF exceeds 5 MB upload limit")
         pdf = pypdf.PdfReader(io.BytesIO(content))
         text_pages = []
         for page in pdf.pages:
@@ -170,6 +183,9 @@ def extract_protocol_pdf(
     rules_out = result.to_dict()["rules"]
     for rule in rules_out:
         rule["status"] = "pending"
+        _persist_rule(db, rule)
+    add_audit_event(db, "protocol_pdf_extraction", "ProtocolRule", "batch", source="watsonx.ai", details=f"{len(rules_out)} rules extracted")
+    db.commit()
 
     logger.info(
         "POST /ai/extract-protocol-pdf complete | rules=%d | warnings=%d",
@@ -284,6 +300,7 @@ def explain_risk(
 def generate_capa(
     body: GenerateCapaRequest,
     svc: WatsonxService = Depends(get_watsonx),
+    db: Session = Depends(get_db),
 ) -> GenerateCapaResponse:
     """
     Draft a CAPA for the confirmed deviation described in *body*.
@@ -319,6 +336,18 @@ def generate_capa(
     generator = CapaGenerator(svc)
     draft = generator.generate(deviation)
 
+    from src.backend.db_models import DetectedDeviationRecord
+    persisted_dev = db.query(DetectedDeviationRecord).filter_by(deviation_id=body.deviation_id).order_by(DetectedDeviationRecord.id.desc()).first()
+    capa_id = f"CAPA-{uuid.uuid4().hex[:12].upper()}"
+    db.add(CapaRecord(capa_id=capa_id, deviation_id=body.deviation_id, site_id=body.site_id,
+        patient_id=persisted_dev.patient_id if persisted_dev else None,
+        root_cause_analysis=draft.root_cause_analysis, immediate_actions=json.dumps(draft.immediate_actions),
+        preventive_actions=json.dumps(draft.preventive_actions), timeline=json.dumps(draft.timeline),
+        effectiveness_check=draft.effectiveness_check, full_draft=draft.full_draft,
+        status="draft", human_review_required=True, provider="watsonx.ai"))
+    add_audit_event(db, "capa_generation", "CAPA", capa_id, new_status="draft", source="watsonx.ai", details=f"Draft generated for {body.deviation_id}")
+    db.commit()
+
     logger.info(
         "POST /ai/generate-capa complete | deviation=%s | immediate_actions=%d | "
         "preventive_actions=%d",
@@ -328,6 +357,7 @@ def generate_capa(
     )
 
     return GenerateCapaResponse(
+        capa_id=capa_id,
         deviation_id=body.deviation_id,
         # status and human_review_required are always "draft" / True (schema default)
         root_cause_analysis=draft.root_cause_analysis,
@@ -338,3 +368,17 @@ def generate_capa(
         full_draft=draft.full_draft,
         warnings=draft.warnings,
     )
+
+
+def _persist_rule(db: Session, rule: dict) -> None:
+    """Store AI-extracted review data only; never alter executable engine rules."""
+    rule_id = rule["rule_id"]
+    existing = db.query(ProtocolRuleRecord).filter_by(rule_id=rule_id).first()
+    if existing:
+        # Rule IDs can recur across extractions; preserve review history/status.
+        return
+    db.add(ProtocolRuleRecord(rule_id=rule_id, category=rule.get("category"),
+        description=rule.get("description"), condition=rule.get("condition"),
+        expected_value=rule.get("expected_value"), allowed_range=rule.get("allowed_range"),
+        unit=rule.get("unit"), visit=rule.get("visit"), severity_hint=rule.get("severity_hint"),
+        source_text=rule.get("source_text"), confidence=rule.get("confidence"), status="pending"))

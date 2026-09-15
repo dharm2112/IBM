@@ -1,5 +1,56 @@
-import { mockApi, setMockSites, setMockDeviations, addMockCapa, addMockProtocolRules } from './mock';
-import type { Site, Deviation, Capa, ProtocolRule } from './types';
+import type { Capa, CapaStatus, ProtocolRule } from './types';
+
+// Map a raw /capas DB row to the frontend Capa shape
+function mapCapa(x: any): Capa {
+  // DB stores status lowercase; frontend Kanban expects title-case
+  const statusMap: Record<string, CapaStatus> = {
+    draft: 'Draft',
+    'pending review': 'Pending Review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    closed: 'Closed',
+  };
+  return {
+    capa_id: x.capa_id,
+    deviation_id: x.deviation_id,
+    title: `AI Generated CAPA for ${x.deviation_id}`,
+    root_cause_hypothesis: x.root_cause_analysis || '',
+    immediate_action: Array.isArray(x.immediate_actions) ? x.immediate_actions.join(' ') : (x.immediate_actions || ''),
+    corrective_action: 'See preventive actions',
+    preventive_action: Array.isArray(x.preventive_actions) ? x.preventive_actions.join(' ') : (x.preventive_actions || ''),
+    verification_method: x.effectiveness_check || '',
+    owner_role: 'Principal Investigator',
+    status: statusMap[x.status?.toLowerCase()] ?? 'Draft',
+    ai_generated: true,
+    requires_human_approval: x.human_review_required ?? true,
+  };
+}
+
+// Map a raw /protocol/rules DB row to the frontend ProtocolRule shape
+function mapProtocolRule(x: any): ProtocolRule {
+  const statusMap: Record<string, 'PENDING' | 'APPROVED' | 'REJECTED'> = {
+    pending: 'PENDING',
+    approved: 'APPROVED',
+    rejected: 'REJECTED',
+  };
+  return {
+    rule_id: x.rule_id,
+    category: x.category || 'Extracted',
+    name: `Extracted: ${x.category || x.rule_id}`,
+    description: x.description || '',
+    condition: x.condition,
+    expected_value: x.expected_value,
+    allowed_range: x.allowed_range,
+    unit: x.unit,
+    visit: x.visit,
+    severity_hint: x.severity_hint,
+    source_text: x.source_text,
+    confidence: x.confidence,
+    threshold: '0',
+    protocol_reference: 'AI Extraction',
+    approval_status: statusMap[x.status?.toLowerCase()] ?? 'PENDING',
+  };
+}
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -44,61 +95,31 @@ export const api = {
   },
 
   async recalculateRisk() {
-    // Calls Member 1 rule engine to generate dataset, detect deviations, and score sites.
+    // Run the engine pipeline
     const response = await fetchWithHandler('/run-engine', {
       method: 'POST',
       body: JSON.stringify({ num_sites: 5, patients_per_site: 5 }),
     });
 
-    // Map backend site risk summaries to frontend Site types
-    const newSites: Site[] = response.site_risk_scores.map((s: any) => ({
-      site_id: s.site_id,
-      site_name: `Generated Site ${s.site_id}`,
-      location: 'Simulated Location',
-      principal_investigator: 'Dr. Generated',
-      status: 'Active',
-      patient_count: 5,
-      risk_score: s.risk_score,
-      risk_level: s.risk_level.toUpperCase(),
-    }));
-
-    // Fetch ALL deviations from the DB (not the 10-item truncated sample in the run response)
-    const allDeviationsRaw = await fetchWithHandler('/deviations');
-    const newDeviations: Deviation[] = allDeviationsRaw.map((d: any) => ({
-      deviation_id: d.deviation_id,
-      site_id: d.site_id,
-      patient_id: d.patient_id,
-      visit_id: d.visit_id || 'V-GEN',
-      rule_id: d.rule_id,
-      category: d.category,
-      description: d.description,
-      expected: d.expected || 'N/A',
-      actual: d.actual || 'N/A',
-      severity: d.severity.toUpperCase(),
-      status: d.status || 'Open',
-      detected_at: d.detected_at || new Date().toISOString(),
-    }));
-
-    // Update the mock data in memory so the rest of the app sees the new generated data
-    setMockSites(newSites);
-    setMockDeviations(newDeviations);
+    // We used to fetch sites and deviations here to sync mock cache, but it's no longer needed.
 
     return { success: true, message: response.message };
   },
 
   async explainSite(site_id: string) {
-    // 1. Fetch site and deviations from mock cache (populated by recalculateRisk or default mock)
-    const site = await mockApi.getSite(site_id);
-    const allDeviations = await mockApi.getDeviations({ site_id });
+    // Fetch site and its deviations from real DB endpoints
+    const [site, allDeviations] = await Promise.all([
+      fetchWithHandler(`/sites/${site_id}`),
+      fetchWithHandler(`/deviations?site_id=${site_id}`),
+    ]);
 
-    // 2. Prepare payload exactly as /ai/explain-risk expects (Member 1 to Member 2 data structure)
     const payload = {
       site_id: site.site_id,
       site_name: site.site_name,
       risk_score: site.risk_score,
       risk_level: site.risk_level.toLowerCase(),
       total_patients: site.patient_count,
-      deviations: allDeviations.map(d => ({
+      deviations: allDeviations.map((d: any) => ({
         deviation_id: d.deviation_id,
         rule_id: d.rule_id,
         category: d.category,
@@ -106,29 +127,27 @@ export const api = {
         description: d.description,
         visit: d.visit_id,
         affected_patients: 1,
-        occurrence_count: 1
-      }))
+        occurrence_count: 1,
+      })),
     };
 
-    // 3. Call actual backend
     const result = await fetchWithHandler('/ai/explain-risk', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     return {
       explanation: result.explanation,
       key_findings: result.key_findings,
       recommended_focus: result.recommended_focus,
-      ai_generated: true
+      ai_generated: true,
     };
   },
 
   async generateCapa(deviation_id: string) {
-    // 1. Find deviation from local state
-    const deviation = await mockApi.getDeviation(deviation_id);
+    // Fetch deviation from real DB endpoint
+    const deviation = await fetchWithHandler(`/deviations/${deviation_id}`);
 
-    // 2. Prepare payload
     const payload = {
       deviation_id: deviation.deviation_id,
       rule_id: deviation.rule_id,
@@ -136,18 +155,17 @@ export const api = {
       severity: deviation.severity.toLowerCase(),
       description: deviation.description,
       protocol_requirement: deviation.expected || 'Follow protocol',
-      site_id: deviation.site_id
+      site_id: deviation.site_id,
     };
 
-    // 3. Call backend
     const result = await fetchWithHandler('/ai/generate-capa', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
-    // 4. Map backend CAPA response to frontend Capa type
+    // capa_id is now returned from the backend (persisted in DB)
     const newCapa: Capa = {
-      capa_id: `CAPA-${deviation_id}`,
+      capa_id: result.capa_id || `CAPA-${deviation_id}`,
       deviation_id: deviation.deviation_id,
       title: `AI Generated CAPA for ${deviation.rule_id}`,
       root_cause_hypothesis: result.root_cause_analysis,
@@ -158,11 +176,9 @@ export const api = {
       owner_role: 'Principal Investigator',
       status: 'Draft',
       ai_generated: true,
-      requires_human_approval: result.human_review_required
+      requires_human_approval: result.human_review_required,
     };
 
-    addMockCapa(newCapa);
-    
     return newCapa;
   },
 
@@ -176,7 +192,6 @@ export const api = {
         body: formData,
       });
     } else {
-      // Fallback for simple text files if uploaded
       const text = await file.text();
       result = await fetchWithHandler('/ai/extract-protocol', {
         method: 'POST',
@@ -184,7 +199,7 @@ export const api = {
       });
     }
 
-    // Map extracted rules to frontend ProtocolRule type
+    // Rules are persisted to DB by the backend; just return the mapped list
     const newRules: ProtocolRule[] = (result.rules || []).map((extracted: any) => ({
       rule_id: extracted.rule_id || `RULE-${Math.floor(Math.random() * 1000)}`,
       category: extracted.category || 'Extracted',
@@ -201,19 +216,15 @@ export const api = {
       threshold: '0',
       severity: (extracted.severity || 'MINOR').toUpperCase() as any,
       protocol_reference: extracted.protocol_reference || (file.type === 'application/pdf' ? 'PDF Extraction' : 'Text Extraction'),
-      approval_status: extracted.status === 'pending' ? 'PENDING' : 'APPROVED'
+      approval_status: extracted.status === 'pending' ? 'PENDING' : 'APPROVED',
     }));
 
-    if (newRules.length > 0) {
-      addMockProtocolRules(newRules);
-      return newRules;
-    }
-    
+    if (newRules.length > 0) return newRules;
     throw new Error('No rules were extracted from this document.');
   },
 
   // ---------------------------------------------------------
-  // MOCK FALLBACKS (Endpoints not yet implemented in backend)
+  // REAL BACKEND DATA ENDPOINTS
   // ---------------------------------------------------------
 
   async getSites() {
@@ -225,15 +236,15 @@ export const api = {
   },
 
   async getPatient(patient_id: string) {
-    return mockApi.getPatient(patient_id);
+    return await fetchWithHandler(`/patients/${patient_id}`);
   },
 
   async getPatientTimeline(patient_id: string) {
-    return mockApi.getPatientTimeline(patient_id);
+    return await fetchWithHandler(`/patients/${patient_id}/timeline`);
   },
 
   async getVisit(visit_id: string) {
-    return mockApi.getVisit(visit_id);
+    return await fetchWithHandler(`/visits/${visit_id}`);
   },
 
   async getDeviations(filters?: { site_id?: string; patient_id?: string; severity?: string }) {
@@ -250,30 +261,44 @@ export const api = {
   },
 
   async getCapas() {
-    return mockApi.getCapas();
+    const raw = await fetchWithHandler('/capas');
+    return raw.map(mapCapa);
   },
 
   async getProtocolRules() {
-    return mockApi.getProtocolRules();
+    const raw = await fetchWithHandler('/protocol/rules');
+    return raw.map(mapProtocolRule);
   },
 
   async approveProtocolRule(rule_id: string) {
-    return mockApi.approveRule(rule_id);
+    return await fetchWithHandler(`/protocol/rules/${rule_id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'approved' }),
+    });
   },
 
   async rejectProtocolRule(rule_id: string) {
-    return mockApi.rejectRule(rule_id);
+    return await fetchWithHandler(`/protocol/rules/${rule_id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'rejected' }),
+    });
   },
 
   async approveCapa(capa_id: string) {
-    return mockApi.approveCapa(capa_id);
+    return await fetchWithHandler(`/capas/${capa_id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'approved' }),
+    });
   },
 
   async rejectCapa(capa_id: string) {
-    return mockApi.rejectCapa(capa_id);
+    return await fetchWithHandler(`/capas/${capa_id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'rejected' }),
+    });
   },
 
   async getAuditLogs() {
-    return mockApi.getAuditLogs();
-  }
+    return await fetchWithHandler('/audit-logs');
+  },
 };
