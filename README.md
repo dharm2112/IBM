@@ -97,8 +97,8 @@ cd src/frontend && npm run dev
 
 | Artifact | Link |
 |---|---|
-| 📹 Demo Video | [See demo/demo-video-link.txt](demo/demo-video-link.txt) |
-| 🌐 Live Demo | [See demo/live-demo-url.txt](demo/live-demo-url.txt) |
+| 📹 Demo Video | [https://youtu.be/wlpUuUVgD8I](https://youtu.be/wlpUuUVgD8I) |
+| 🌐 Live Demo | [Not deployed] |
 | 🖼️ Screenshots | [See demo/screenshots/](demo/screenshots/) |
 | 📊 Presentation | [See presentation/slides.pdf](presentation/) |
 
@@ -112,6 +112,10 @@ We are most proud of how we seamlessly integrated AI-driven insights into a beau
 
 ## ⚠️ Known Limitations
 
-Replace with any known limitations, incomplete features, or shortcuts taken due to time constraints.
+- Authentication is not implemented — the app is open access, not production-ready.
+- CAPA and Protocol Rule approvals are persisted in the DB but the Kanban board status transitions (Draft → Pending Review) require a manual page refresh.
+- The deviation trend chart on the Executive Dashboard uses hardcoded historical values for Weeks 1–3; only the current week reflects live data.
+- Patient count KPI on the dashboard is hardcoded to 100 and does not reflect the actual generated dataset size.
+- The app has only been tested on Chrome and may have layout issues on other browsers.
 
 ---

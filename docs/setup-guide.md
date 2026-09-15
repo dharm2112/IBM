@@ -6,74 +6,87 @@
 
 Before you begin, ensure you have the following installed:
 
-- [ ] [e.g., Python 3.11+]
-- [ ] [e.g., Node.js 18+]
-- [ ] [e.g., Docker Desktop]
-- [ ] [e.g., An IBM Cloud account with watsonx.ai access]
+- [ ] Python 3.11+
+- [ ] Node.js 18+
+- [ ] An IBM Cloud account with watsonx.ai access
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in the values:
+Copy `src/.env.example` to `src/.env` and fill in the values:
 
 ```bash
-cp .env.example .env
+cp src/.env.example src/.env
 ```
 
 | Variable | Description | Required |
 |---|---|---|
-| `WATSONX_API_KEY` | Your IBM watsonx.ai API key | Yes |
+| `WATSONX_APIKEY` | Your IBM Cloud API key | Yes |
 | `WATSONX_PROJECT_ID` | Your watsonx.ai project ID | Yes |
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `SLACK_WEBHOOK_URL` | Slack webhook for alerts | No |
+| `WATSONX_URL` | Regional endpoint e.g. `https://us-south.ml.cloud.ibm.com` | Yes |
+| `WATSONX_MODEL_ID` | Foundation model e.g. `ibm/granite-13b-instruct-v2` | Yes |
+| `DATABASE_URL` | SQLite (default) or PostgreSQL connection string | No |
+| `APP_ENV` | `development` \| `staging` \| `production` | No |
+| `LOG_LEVEL` | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR` | No |
 
 ## Installation
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/[your-org]/[your-repo].git
-cd [your-repo]
+git clone https://github.com/dharm2112/bob-ai-hackathon-Winterarc.git
+cd bob-ai-hackathon-Winterarc
 
 # 2. Install backend dependencies
-[your command — e.g.: pip install -r requirements.txt]
+pip install -r src/requirements.txt
 
-# 3. Install frontend dependencies (if applicable)
-[your command — e.g.: cd frontend && npm install]
-
-# 4. Set up the database (if applicable)
-[your command — e.g.: python manage.py migrate]
+# 3. Install frontend dependencies
+cd src/frontend
+npm install
+cd ../..
 ```
 
 ## Running the Application
 
 ```bash
-# Start the backend
-[your command — e.g.: uvicorn app.main:app --reload]
+# Start the backend (from repo root)
+uvicorn src.backend.main:app --reload --port 8000
 
-# Start the frontend (in a separate terminal, if applicable)
-[your command — e.g.: cd frontend && npm run dev]
+# Start the frontend (separate terminal, from repo root)
+cd src/frontend && npm run dev
 ```
 
-The application will be available at: `http://localhost:[PORT]`
+The backend will be available at: `http://localhost:8000`  
+The frontend will be available at: `http://localhost:5173`  
+API docs (Swagger): `http://localhost:8000/docs`
 
 ## Running Tests
 
 ```bash
-[your test command — e.g.: pytest tests/ -v]
+# Backend unit tests
+pytest src/tests/ -v
+
+# Integration test (requires backend running on port 8000)
+python integration_test.py
 ```
 
-## Quick Demo (Optional)
+## Quick Demo
 
-If you have a demo script or sample data to showcase the project quickly:
+After the backend is running, trigger the rule engine to generate data:
 
 ```bash
-[e.g.: python demo/seed_demo_data.py]
-[e.g.: open http://localhost:8000/demo]
+# Generate synthetic trial data and run the rule engine
+curl -X POST http://localhost:8000/run-engine \
+  -H "Content-Type: application/json" \
+  -d '{"num_sites": 5, "patients_per_site": 5}'
 ```
+
+Then open the frontend at `http://localhost:5173` and click **Recalculate Risk** on the dashboard.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |---|---|
-| [e.g., `ModuleNotFoundError`] | [e.g., Run `pip install -r requirements.txt` again] |
-| [e.g., Database connection refused] | [e.g., Ensure PostgreSQL is running: `docker compose up db`] |
-| [e.g., watsonx.ai 401 error] | [e.g., Check `WATSONX_API_KEY` in your `.env` file] |
+| `ModuleNotFoundError` | Run `pip install -r src/requirements.txt` from the repo root |
+| `WatsonxConfigError` on startup | Check `WATSONX_APIKEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL` in `src/.env` |
+| Frontend shows no data | Click **Recalculate Risk** on the dashboard to run the engine and populate the DB |
+| CORS error in browser | Ensure `APP_ENV=development` in `src/.env` so the backend allows all origins |
+| SQLite DB locked | Stop all running backend processes before restarting |
