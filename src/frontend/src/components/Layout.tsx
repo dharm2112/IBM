@@ -127,10 +127,10 @@ const Layout = () => {
         {/* Brand */}
         <div style={{ padding: '24px 16px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <Shield size={20} color="#007AFF" />
+            <img src="/logo.svg" alt="TrialGuard Logo" style={{ height: 32, width: 'auto', transform: 'scale(1.15)', transformOrigin: 'left center' }} />
             <div style={{ fontSize: '14px', fontWeight: 500, color: '#1D1D1F' }}>TrialGuard</div>
           </div>
-          <div style={{ fontSize: '11px', color: '#6E6E73', paddingLeft: 28 }}>Clinical Ops</div>
+          <div style={{ fontSize: '11px', color: '#6E6E73', paddingLeft: 42 }}>Clinical Ops</div>
         </div>
 
         {/* Nav */}

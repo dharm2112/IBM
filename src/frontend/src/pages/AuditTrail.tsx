@@ -27,18 +27,18 @@ const T = {
 // ─── Actor Badge ──────────────────────────────────────────────────────────────
 const ActorBadge: React.FC<{ actor: string }> = ({ actor }) => {
   if (actor === 'System') return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, fontSize: '10px', fontWeight: 600, background: T.surface2, color: T.sub, border: `1px solid ${T.border}` }}>
-      <Terminal size={10} /> SYSTEM
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 10px', height: 24, borderRadius: 12, fontSize: '11px', fontWeight: 400, background: '#F2F2F7', color: '#6E6E73' }}>
+      <Terminal size={11} color="#6E6E73" /> System
     </span>
   );
   if (actor === 'watsonx.ai') return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, fontSize: '10px', fontWeight: 600, background: T.blueBg, color: T.accent, border: `1px solid rgba(0,122,255,0.2)` }}>
-      <Sparkles size={10} /> WATSONX.AI
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 10px', height: 24, borderRadius: 12, fontSize: '11px', fontWeight: 500, background: 'rgba(0,122,255,0.08)', color: '#007AFF' }}>
+      <Sparkles size={12} color="#007AFF" /> watsonx.ai
     </span>
   );
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, fontSize: '10px', fontWeight: 600, background: '#F0F5FF', color: '#0040DD', border: `1px solid rgba(0,64,221,0.15)`, textTransform: 'uppercase' }}>
-      <User size={10} /> {actor}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 10px', height: 24, borderRadius: 12, fontSize: '11px', fontWeight: 400, background: '#F2F2F7', color: '#1D1D1F' }}>
+      <User size={11} color="#1D1D1F" /> {actor}
     </span>
   );
 };
@@ -46,44 +46,42 @@ const ActorBadge: React.FC<{ actor: string }> = ({ actor }) => {
 // ─── Action Dot ───────────────────────────────────────────────────────────────
 const actionColor = (action: string) => {
   const l = action.toLowerCase();
-  if (l.includes('approved') || l.includes('generated')) return T.green;
-  if (l.includes('rejected')) return T.red;
-  if (l.includes('detected') || l.includes('recalculated')) return T.amber;
-  return T.muted;
+  if (l.includes('approved') || l.includes('generated')) return '#34C759';
+  if (l.includes('rejected')) return '#FF3B30';
+  if (l.includes('detected') || l.includes('recalculated')) return '#FF9500';
+  return '#AEAEB2';
 };
 
 // ─── Log Row ──────────────────────────────────────────────────────────────────
-const LogRow: React.FC<{ log: AuditLog; isNew?: boolean }> = ({ log, isNew }) => {
+const LogRow: React.FC<{ log: AuditLog }> = ({ log }) => {
   const ts = new Date(log.timestamp);
   const dateStr = ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const timeStr = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
-    <tr style={{ borderBottom: `1px solid ${T.borderLight}`, transition: 'background-color 0.2s', background: isNew ? T.amberBg : 'transparent' }} onMouseOver={(e) => e.currentTarget.style.background = T.surface2} onMouseOut={(e) => e.currentTarget.style.background = isNew ? T.amberBg : 'transparent'}>
-      <td style={{ padding: '16px 24px', verticalAlign: 'top', width: 140 }}>
-        <div style={{ fontSize: '11px', fontWeight: 500, color: T.text, marginBottom: 2 }}>{dateStr}</div>
-        <div style={{ fontSize: '11px', color: T.muted, fontFamily: 'SF Mono, monospace' }}>{timeStr}</div>
-      </td>
-      <td style={{ padding: '16px 0', verticalAlign: 'top', width: 32 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: actionColor(log.action), boxShadow: `0 0 0 4px ${T.surface}` }} />
+    <tr style={{ borderBottom: '0.5px solid rgba(0,0,0,0.06)', height: 56, transition: 'background-color 0.12s', background: '#ffffff' }} onMouseOver={(e) => e.currentTarget.style.background = '#F5F5F7'} onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}>
+      <td style={{ padding: '0 12px', verticalAlign: 'middle', width: 140, position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', width: 7, height: 7, borderRadius: '50%', background: actionColor(log.action) }} />
+        <div style={{ paddingLeft: 12 }}>
+          <div style={{ fontSize: '13px', fontWeight: 400, color: '#1D1D1F', marginBottom: 2 }}>{dateStr}</div>
+          <div style={{ fontSize: '11px', color: '#AEAEB2' }}>{timeStr}</div>
         </div>
       </td>
-      <td style={{ padding: '16px 16px', verticalAlign: 'top' }}>
+      <td style={{ padding: '0 12px', verticalAlign: 'middle', width: 140 }}>
         <ActorBadge actor={log.actor} />
       </td>
-      <td style={{ padding: '16px 16px', verticalAlign: 'top' }}>
-        <span style={{ fontSize: '13px', fontWeight: 600, color: T.text }}>{log.action}</span>
+      <td style={{ padding: '0 12px', verticalAlign: 'middle', width: 180 }}>
+        <span style={{ fontSize: '13px', fontWeight: 500, color: '#1D1D1F' }}>{log.action}</span>
       </td>
-      <td style={{ padding: '16px 16px', verticalAlign: 'top' }}>
-        <div style={{ fontSize: '11px', fontWeight: 500, color: T.sub, marginBottom: 2 }}>{log.entity_type}</div>
-        <div style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.muted }}>{log.entity_id}</div>
+      <td style={{ padding: '0 12px', verticalAlign: 'middle', width: 120 }}>
+        <div style={{ fontSize: '13px', color: '#1D1D1F', marginBottom: 2 }}>{log.entity_type}</div>
+        <div style={{ fontSize: '11px', color: '#AEAEB2' }}>{log.entity_id}</div>
       </td>
-      <td style={{ padding: '16px 24px', verticalAlign: 'top' }}>
-        <p style={{ fontSize: '11px', color: T.sub, margin: 0, lineHeight: 1.5 }}>{log.details}</p>
+      <td style={{ padding: '0 12px', verticalAlign: 'middle' }}>
+        <div style={{ fontSize: '13px', color: '#6E6E73', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{log.details}</div>
       </td>
-      <td style={{ padding: '16px 24px', verticalAlign: 'top', textAlign: 'right' }}>
-        <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '10px', color: T.muted }}>{log.audit_id}</span>
+      <td style={{ padding: '0 12px', verticalAlign: 'middle', width: 80, textAlign: 'right' }}>
+        <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: '#AEAEB2' }}>{log.audit_id}</span>
       </td>
     </tr>
   );
@@ -146,25 +144,25 @@ export const AuditTrail = () => {
       style={{ display: 'flex', flexDirection: 'column', gap: 24, marginTop: -40 }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 24, borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 32 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <Shield size={20} color={T.sub} />
-            <h1 style={{ fontSize: '28px', fontWeight: 600, color: T.text, margin: 0, letterSpacing: '-0.01em' }}>Audit Trail</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <Shield size={18} color="#6E6E73" />
+            <h1 style={{ fontSize: '28px', fontWeight: 300, color: '#1D1D1F', margin: 0 }}>Audit trail</h1>
           </div>
-          <p style={{ fontSize: '13px', color: T.sub, margin: 0 }}>
+          <p style={{ fontSize: '13px', color: '#6E6E73', margin: 0 }}>
             Immutable, chronological log of all system, AI, and human actions.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: T.text }}>{filtered.length} entries</div>
-            <div style={{ fontSize: '10px', color: T.muted }}>Auto-refresh every 15s</div>
+            <div style={{ fontSize: '12px', color: '#AEAEB2' }}>{filtered.length} entries</div>
+            <div style={{ fontSize: '11px', color: '#AEAEB2' }}>Auto-refresh every 15s</div>
           </div>
           <button
             onClick={() => fetchLogs(true)}
             disabled={isRefreshing}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, height: 36, padding: '0 16px', fontSize: '13px', fontWeight: 500, color: T.text, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, cursor: isRefreshing ? 'not-allowed' : 'pointer', opacity: isRefreshing ? 0.5 : 1, transition: 'background 0.2s' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: 0, fontSize: '13px', color: '#007AFF', background: 'transparent', border: 'none', cursor: isRefreshing ? 'not-allowed' : 'pointer', opacity: isRefreshing ? 0.5 : 1 }}
           >
             <RefreshCw size={14} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
             <span>Refresh</span>
@@ -173,93 +171,92 @@ export const AuditTrail = () => {
       </div>
 
       {/* KPI Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {[
           { label: 'Total Events',   value: logs.length },
           { label: 'System Actions', value: logs.filter(l => l.actor === 'System').length },
           { label: 'AI Actions',     value: logs.filter(l => l.actor === 'watsonx.ai').length },
           { label: 'Human Actions',  value: logs.filter(l => l.actor !== 'System' && l.actor !== 'watsonx.ai').length },
         ].map((k) => (
-          <div key={k.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <span style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 12 }}>{k.label}</span>
-            <span style={{ fontSize: '34px', fontWeight: 300, color: T.text, lineHeight: 1, letterSpacing: '-0.02em' }}>{k.value}</span>
+          <div key={k.label} style={{ background: '#F5F5F7', borderRadius: 10, padding: 20 }}>
+            <span style={{ fontSize: '10px', color: '#AEAEB2', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 8 }}>{k.label}</span>
+            <span style={{ fontSize: '32px', fontWeight: 300, color: '#1D1D1F', lineHeight: 1 }}>{k.value}</span>
           </div>
         ))}
       </div>
 
       {/* Legend & Filters Container */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 48, marginTop: 8 }}>
         
         {/* Legend */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24, fontSize: '11px', color: T.sub }}>
-          <span style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: T.muted }}>Legend</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ fontSize: '11px', color: '#AEAEB2' }}>Legend</span>
           {[
-            { color: T.green,  label: 'Approved / Generated' },
-            { color: T.red,    label: 'Rejected' },
-            { color: T.amber,  label: 'Detected / Recalculated' },
-            { color: T.muted,  label: 'Other' },
+            { color: '#34C759', label: 'Approved / Generated' },
+            { color: '#FF3B30', label: 'Rejected' },
+            { color: '#FF9500', label: 'Detected / Recalculated' },
+            { color: '#AEAEB2', label: 'Other' },
           ].map((l) => (
-            <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: l.color }} />
+            <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12px', color: '#6E6E73' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: l.color }} />
               {l.label}
             </span>
           ))}
         </div>
 
         {/* Filters */}
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-            <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.muted }} size={16} />
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ position: 'relative', width: 240 }}>
+            <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#AEAEB2' }} size={14} />
             <input
               type="text"
-              placeholder="Search actions, details, entity IDs..."
+              placeholder="Search actions..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', height: 36, padding: '0 16px 0 36px', fontSize: '13px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, outline: 'none' }}
+              style={{ width: '100%', height: 36, padding: '0 12px 0 32px', fontSize: '13px', background: '#F2F2F7', border: 'none', borderRadius: 10, color: '#1D1D1F', outline: 'none' }}
             />
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <select
-              value={actorFilter}
-              onChange={(e) => setActorFilter(e.target.value)}
-              style={{ height: 36, padding: '0 32px 0 12px', fontSize: '13px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, outline: 'none', appearance: 'auto' }}
-            >
-              {actors.map((a) => <option key={a}>{a}</option>)}
-            </select>
-            <select
-              value={entityFilter}
-              onChange={(e) => setEntityFilter(e.target.value)}
-              style={{ height: 36, padding: '0 32px 0 12px', fontSize: '13px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, outline: 'none', appearance: 'auto' }}
-            >
-              {entities.map((e) => <option key={e}>{e}</option>)}
-            </select>
-          </div>
+          <select
+            value={actorFilter}
+            onChange={(e) => setActorFilter(e.target.value)}
+            style={{ height: 36, padding: '0 12px', fontSize: '13px', background: '#F2F2F7', border: 'none', borderRadius: 10, color: '#1D1D1F', outline: 'none' }}
+          >
+            {actors.map((a) => <option key={a}>{a}</option>)}
+          </select>
+          <select
+            value={entityFilter}
+            onChange={(e) => setEntityFilter(e.target.value)}
+            style={{ height: 36, padding: '0 12px', fontSize: '13px', background: '#F2F2F7', border: 'none', borderRadius: 10, color: '#1D1D1F', outline: 'none' }}
+          >
+            {entities.map((e) => <option key={e}>{e}</option>)}
+          </select>
         </div>
       </div>
 
       {/* Log Table */}
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <div style={{ marginTop: 8 }}>
         {isLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: T.sub, fontSize: '13px' }}>Loading audit log...</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#AEAEB2', fontSize: '13px' }}>Loading audit log...</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-              <thead style={{ background: T.surface2, borderBottom: `1px solid ${T.borderLight}` }}>
-                <tr>
-                  {['Timestamp', '', 'Actor', 'Action', 'Entity', 'Details', 'Audit ID'].map((h, i) => (
-                    <th key={i} style={{ padding: '12px 24px', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
-                      {h}
-                    </th>
-                  ))}
+            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <thead>
+                <tr style={{ borderBottom: '0.5px solid rgba(0,0,0,0.08)', height: 32 }}>
+                  <th style={{ padding: '0 12px', fontSize: '10px', color: '#AEAEB2', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 400, width: 140 }}>Timestamp</th>
+                  <th style={{ padding: '0 12px', fontSize: '10px', color: '#AEAEB2', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 400, width: 140 }}>Actor</th>
+                  <th style={{ padding: '0 12px', fontSize: '10px', color: '#AEAEB2', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 400, width: 180 }}>Action</th>
+                  <th style={{ padding: '0 12px', fontSize: '10px', color: '#AEAEB2', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 400, width: 120 }}>Entity</th>
+                  <th style={{ padding: '0 12px', fontSize: '10px', color: '#AEAEB2', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 400 }}>Details</th>
+                  <th style={{ padding: '0 12px', fontSize: '10px', color: '#AEAEB2', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 400, width: 80, textAlign: 'right' }}>Audit ID</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((log) => (
-                  <LogRow key={log.audit_id} log={log} isNew={newLogIds.has(log.audit_id)} />
+                  <LogRow key={log.audit_id} log={log} />
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: 48, textAlign: 'center', fontSize: '13px', color: T.muted }}>
+                    <td colSpan={6} style={{ padding: 48, textAlign: 'center', fontSize: '13px', color: '#AEAEB2' }}>
                       No audit events match your filters.
                     </td>
                   </tr>
@@ -271,8 +268,8 @@ export const AuditTrail = () => {
       </div>
 
       {/* Footer note */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '11px', color: T.muted, paddingBottom: 24 }}>
-        <Shield size={12} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '11px', color: '#AEAEB2', height: 40, borderTop: '0.5px solid rgba(0,0,0,0.08)' }}>
+        <Shield size={13} />
         <span>This audit log is append-only and tamper-evident. All entries are cryptographically signed in production.</span>
       </div>
       
