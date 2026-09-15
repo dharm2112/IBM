@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../api/client';
 import type { AuditLog } from '../api/types';
 import { RefreshCw, Shield, Search, Terminal, User, Sparkles } from 'lucide-react';
