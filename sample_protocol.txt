@@ -1,0 +1,13 @@
+Clinical Trial Protocol: CT-SAMPLE-101
+
+1. Eligibility:
+- Patients must be 18 to 65 years old.
+- Must have a BMI between 18.5 and 29.9.
+
+2. Dosing:
+- The required dose is 50 mg administered orally once daily.
+- A missed dose must not be replaced by a double dose.
+
+3. Monitoring:
+- Blood pressure must be measured at every visit.
+- Any severe adverse event (SAE) must be reported within 24 hours.

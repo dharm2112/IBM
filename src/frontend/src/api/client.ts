@@ -220,7 +220,12 @@ export const api = {
     }));
 
     if (newRules.length > 0) return newRules;
-    throw new Error('No rules were extracted from this document.');
+    
+    // Throw the warning string from the backend if available
+    const msg = result.warnings && result.warnings.length > 0 
+      ? result.warnings[0] 
+      : 'No rules were extracted from this document.';
+    throw new Error(msg);
   },
 
   // ---------------------------------------------------------
@@ -233,6 +238,11 @@ export const api = {
 
   async getSite(site_id: string) {
     return await fetchWithHandler(`/sites/${site_id}`);
+  },
+
+  async getPatients(site_id?: string) {
+    const qs = site_id ? `?site_id=${encodeURIComponent(site_id)}` : '';
+    return await fetchWithHandler(`/patients${qs}`);
   },
 
   async getPatient(patient_id: string) {

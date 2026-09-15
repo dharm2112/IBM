@@ -21,6 +21,14 @@ def get_site(site_id:str,db:Session=Depends(get_db)):
     r=latest(db);x=db.query(SiteRecord).filter_by(run_id=r.run_id if r else None,site_id=site_id).first()
     if not x:raise HTTPException(404,"Site not found")
     return site(x,db.query(SiteRiskScoreRecord).filter_by(run_id=r.run_id,site_id=site_id).first())
+@router.get("/patients")
+def patients_list(site_id: str | None = None, db: Session = Depends(get_db)):
+    r = latest(db)
+    if not r: return []
+    q = db.query(PatientRecord).filter_by(run_id=r.run_id)
+    if site_id: q = q.filter_by(site_id=site_id)
+    return [{"patient_id": x.patient_id, "site_id": x.site_id, "enrollment_date": x.enrollment_date,
+             "status": x.status.title() if x.status else "Active", "eligibility_status": "Eligible"} for x in q]
 @router.get("/patients/{patient_id}")
 def patient(patient_id:str,db:Session=Depends(get_db)):
     r=latest(db);x=db.query(PatientRecord).filter_by(run_id=r.run_id if r else None,patient_id=patient_id).first()

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Site, Deviation } from '../api/types';
 import { DataTable, RiskBadge, SeverityBadge, AIBanner, DetailDrawer, EvidencePanel } from '../components';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, User } from 'lucide-react';
 import { motion } from 'motion/react';
 
 // ── Apple HIG Tokens ────────────────────────────────────────────────────────
@@ -25,8 +25,10 @@ const T = {
 
 export const SiteDetails = () => {
   const { siteId } = useParams();
+  const navigate = useNavigate();
   const [site, setSite] = useState<Site | null>(null);
   const [deviations, setDeviations] = useState<Deviation[]>([]);
+  const [patients, setPatients] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDeviation, setSelectedDeviation] = useState<Deviation | null>(null);
   
@@ -39,12 +41,14 @@ export const SiteDetails = () => {
       if (!siteId) return;
       setIsLoading(true);
       try {
-        const [fetchedSite, fetchedDeviations] = await Promise.all([
+        const [fetchedSite, fetchedDeviations, fetchedPatients] = await Promise.all([
           api.getSite(siteId),
-          api.getDeviations({ site_id: siteId })
+          api.getDeviations({ site_id: siteId }),
+          api.getPatients(siteId),
         ]);
         setSite(fetchedSite);
         setDeviations(fetchedDeviations);
+        setPatients(fetchedPatients);
       } catch (error) {
         console.error("Failed to fetch site data", error);
       } finally {
@@ -73,27 +77,34 @@ export const SiteDetails = () => {
 
   const deviationColumns = [
     { key: 'id', header: 'ID', render: (d: Deviation) => <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.text, fontWeight: 500 }}>{d.deviation_id}</span> },
-    { key: 'patient', header: 'Patient', render: (d: Deviation) => <span style={{ fontSize: '13px', color: T.sub }}>{d.patient_id}</span> },
+    { key: 'patient', header: 'Patient', render: (d: Deviation) => (
+      <span
+        style={{ fontSize: '13px', color: T.accent, cursor: 'pointer', textDecoration: 'underline' }}
+        onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/patients/${d.patient_id}`); }}
+      >{d.patient_id}</span>
+    )},
     { key: 'rule', header: 'Rule', render: (d: Deviation) => <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.sub }}>{d.rule_id}</span> },
     { key: 'category', header: 'Category', render: (d: Deviation) => <span style={{ fontSize: '13px', color: T.text }}>{d.category}</span> },
     { key: 'severity', header: 'Severity', render: (d: Deviation) => <SeverityBadge level={d.severity} /> },
     { key: 'status', header: 'Status', render: (d: Deviation) => <span style={{ fontSize: '10px', fontWeight: 500, padding: '2px 8px', background: T.surface2, borderRadius: 10, color: T.text, textTransform: 'capitalize' }}>{d.status}</span> },
   ];
 
-  const riskDriversData = [
-    { name: 'Dosing violations', value: 6, fill: T.accent },
-    { name: 'Missed safety visits', value: 4, fill: T.sub },
-    { name: 'Medication violations', value: 2, fill: T.muted },
-    { name: 'Repeat deviations', value: 3, fill: '#DDE1E4' },
-  ].sort((a, b) => b.value - a.value);
+  // Build category breakdown from real deviation data
+  const categoryBreakdownData = Object.entries(
+    deviations.reduce((acc: Record<string, number>, d) => {
+      const cat = d.category || 'Other';
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {})
+  )
+    .map(([name, value], i) => ({ name, value, fill: [T.accent, '#8B5CF6', '#EC4899', '#F43F5E', T.amber][i % 5] }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
 
-  const categoryBreakdownData = [
-    { name: 'Dosing', value: 8, fill: T.accent },
-    { name: 'Visit', value: 5, fill: '#8B5CF6' },
-    { name: 'Medication', value: 3, fill: '#EC4899' },
-    { name: 'Laboratory', value: 2, fill: '#F43F5E' },
-    { name: 'Procedural', value: 1, fill: T.amber },
-  ];
+  const riskDriversData = categoryBreakdownData.map((d, i) => ({
+    ...d,
+    fill: [T.accent, T.sub, T.muted, '#DDE1E4', T.border][i % 5],
+  }));
 
   return (
     <motion.div 
@@ -181,8 +192,38 @@ export const SiteDetails = () => {
           </div>
         </div>
 
-        {/* Right Column: AI Analysis */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* Right Column: Patients + AI Analysis */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Enrolled Patients */}
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.borderLight}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <User size={14} color={T.accent} />
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: T.text, margin: 0 }}>Enrolled Patients</h3>
+              <span style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: 600, padding: '2px 8px', background: T.surface2, borderRadius: 10, color: T.sub }}>{patients.length}</span>
+            </div>
+            {patients.length === 0 ? (
+              <div style={{ padding: 24, textAlign: 'center', fontSize: '13px', color: T.muted }}>No patients found. Run the engine first.</div>
+            ) : (
+              patients.map((p, i) => (
+                <div
+                  key={p.patient_id}
+                  onClick={() => navigate(`/dashboard/patients/${p.patient_id}`)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < patients.length - 1 ? `1px solid ${T.borderLight}` : 'none', cursor: 'pointer' }}
+                  onMouseOver={e => (e.currentTarget.style.background = T.surface2)}
+                  onMouseOut={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: T.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <User size={13} color={T.sub} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: T.text, fontFamily: 'SF Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.patient_id}</div>
+                    <div style={{ fontSize: '11px', color: T.sub }}>{p.status}</div>
+                  </div>
+                  <span style={{ fontSize: '10px', color: T.accent, fontWeight: 600 }}>View →</span>
+                </div>
+              ))
+            )}
+          </div>
           <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ padding: '20px 24px', borderBottom: `1px solid ${T.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.surface }}>
               <div>

@@ -255,23 +255,47 @@ def _extract_json_array(raw: str) -> list[dict]:
     """
     text = raw.strip()
 
-    # Strip markdown code fences if present
-    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\s*```$", "", text)
+    # Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*```$', '', text)
     text = text.strip()
 
     # Find the outermost JSON array
-    start = text.find("[")
-    end = text.rfind("]")
+    start = text.find('[')
+    end = text.rfind(']')
     if start == -1 or end == -1 or end <= start:
         raise ProtocolParseError(
             f"Model response does not contain a JSON array. "
             f"First 200 chars: {text[:200]!r}"
         )
 
+    candidate = text[start : end + 1]
+
+    # First attempt: parse as-is
     try:
-        return json.loads(text[start : end + 1])
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+
+    # Second attempt: fix trailing commas before ] or }
+    fixed = re.sub(r',\s*([\]}])', r'\1', candidate)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # Third attempt: replace literal unescaped newlines inside strings
+    # (model sometimes emits multi-line string values without escaping)
+    fixed2 = re.sub(r'(?<!\\)\n', r'\\n', fixed)
+    fixed2 = re.sub(r'(?<!\\)\r', '', fixed2)
+    try:
+        return json.loads(fixed2)
     except json.JSONDecodeError as exc:
+        logger.error(
+            "_extract_json_array: all parse attempts failed. "
+            "Raw candidate (first 400 chars): %r",
+            candidate[:400],
+        )
         raise ProtocolParseError(
             f"Model response contains malformed JSON: {exc}"
         ) from exc
@@ -424,7 +448,7 @@ class ProtocolExtractor:
             temperature=self._temperature,
             top_p=0.95,
             top_k=1,               # near-greedy — we want factual extraction
-            repetition_penalty=1.0,
+            repetition_penalty=1.0, # Disable repetition penalty for mistral models
         )
 
         raw_output = generation.generated_text

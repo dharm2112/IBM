@@ -40,7 +40,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from sqlalchemy.orm import Session
 
 from src.ai.capa_generator import CapaGenerator, DeviationDetail
-from src.ai.protocol_extractor import ProtocolExtractor
+from src.ai.protocol_extractor import ProtocolExtractor, ProtocolParseError
 from src.ai.risk_explainer import (
     DeviationSummary,
     RiskExplainer,
@@ -177,7 +177,25 @@ def extract_protocol_pdf(
     logger.info("POST /ai/extract-protocol-pdf | extracted text_chars=%d", len(extracted_text))
 
     extractor = ProtocolExtractor(svc)
-    result = extractor.extract(extracted_text)
+    try:
+        result = extractor.extract(extracted_text)
+    except ProtocolParseError as parse_err:
+        # Model returned un-parseable JSON — return a graceful 200 with a warning
+        # instead of crashing with 502, so the UI stays functional.
+        logger.warning(
+            "POST /ai/extract-protocol-pdf | ProtocolParseError: %s | filename=%s",
+            str(parse_err)[:200],
+            file.filename,
+        )
+        return ExtractProtocolResponse(
+            rule_count=0,
+            rules=[],
+            warnings=[
+                "The AI model returned a response that could not be parsed as valid JSON. "
+                "This can happen with very short or image-only PDFs. "
+                "Please try again or use a text-based PDF."
+            ],
+        )
 
     # Defensive: ensure status="pending" on every rule regardless of AI output.
     rules_out = result.to_dict()["rules"]

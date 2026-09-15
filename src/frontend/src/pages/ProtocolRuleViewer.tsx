@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { api } from '../api/client';
 import type { ProtocolRule } from '../api/types';
 import { SeverityBadge, AIBanner, ApprovalActions, DetailDrawer, Folder } from '../components';
-import { Upload, Search, CheckCircle, Clock, Loader2, Sparkles, X } from 'lucide-react';
+import { Upload, Search, CheckCircle, Clock, Loader2, Sparkles, X, Plus } from 'lucide-react';
 
 // ── Apple HIG Tokens ────────────────────────────────────────────────────────
 const T = {
@@ -85,10 +85,16 @@ const UploadPanel: React.FC<{ onUpload: (file: File) => Promise<void> }> = ({ on
   const [lastUploaded, setLastUploaded] = useState<string | null>(null);
 
   const handleFile = async (file: File) => {
-    setIsUploading(true);
-    await onUpload(file);
-    setLastUploaded(file.name);
-    setIsUploading(false);
+    try {
+      setIsUploading(true);
+      setLastUploaded(null);
+      await onUpload(file);
+      setLastUploaded(file.name);
+    } catch (err: any) {
+      alert(`Extraction Failed:\n\n${err.message || 'An unknown error occurred.'}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -131,16 +137,18 @@ const UploadPanel: React.FC<{ onUpload: (file: File) => Promise<void> }> = ({ on
             </div>
             <p style={{ fontSize: '13px', fontWeight: 600, color: T.text, margin: '0 0 4px 0' }}>Drop your protocol PDF here</p>
             <p style={{ fontSize: '11px', color: T.sub, margin: '0 0 16px 0' }}>or click to browse</p>
-            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 36, background: T.text, color: '#fff', fontSize: '13px', fontWeight: 500, borderRadius: 10, transition: 'background 0.2s' }}>
-              <Upload size={14} />
-              <span>Browse File</span>
-              <input
-                type="file"
-                accept=".pdf,.docx,.txt"
-                style={{ display: 'none' }}
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-              />
-            </label>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 16px', height: 36, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, fontSize: '13px', fontWeight: 500, cursor: isUploading ? 'not-allowed' : 'pointer', color: isUploading ? T.muted : T.text }}>
+                {isUploading ? <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${T.muted}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} /> : <Upload size={14} />}
+                {isUploading ? 'Extracting...' : 'Upload Protocol PDF'}
+                <input type="file" accept=".pdf,.txt" style={{ display: 'none' }} onChange={e => {
+                  if (e.target.files?.[0]) handleFile(e.target.files[0]);
+                }} disabled={isUploading} />
+              </label>
+              <button style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 16px', height: 36, background: T.accent, color: '#fff', border: 'none', borderRadius: 10, fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>
+                <Plus size={14} /> Add Rule Manually
+              </button>
+            </div>
             {lastUploaded && (
               <p style={{ marginTop: 16, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: T.greenBg, padding: '6px 12px', borderRadius: 8, border: `1px solid rgba(52,199,89,0.2)`, color: '#137333', margin: '16px 0 0 0' }}>
                 <CheckCircle size={12} /> Rule extracted from <strong style={{ fontWeight: 600, margin: '0 4px' }}>{lastUploaded}</strong> — review below

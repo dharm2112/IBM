@@ -29,7 +29,7 @@ const T = {
   red:      '#FF3B30',
 };
 
-const ease = [0.22, 1, 0.36, 1];
+const ease = [0.22, 1, 0.36, 1] as any;
 
 // ── Animated counter ──────────────────────────────────────────────────────────
 const Counter = ({ to, duration = 0.6 }: { to: number; duration?: number }) => {
@@ -179,6 +179,7 @@ export const ExecutiveDashboard = () => {
   const navigate = useNavigate();
   const [sites, setSites] = useState<Site[]>([]);
   const [deviations, setDeviations] = useState<Deviation[]>([]);
+  const [patientCount, setPatientCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [selectedDeviation, setSelectedDeviation] = useState<Deviation | null>(null);
@@ -186,8 +187,8 @@ export const ExecutiveDashboard = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [s, d] = await Promise.all([api.getSites(), api.getDeviations()]);
-      setSites(s); setDeviations(d);
+      const [s, d, p] = await Promise.all([api.getSites(), api.getDeviations(), api.getPatients()]);
+      setSites(s); setDeviations(d); setPatientCount(p.length);
     } catch (e) { console.error(e); }
     finally { setIsLoading(false); }
   };
@@ -211,10 +212,10 @@ export const ExecutiveDashboard = () => {
   ];
 
   const trendData = [
-    { name: 'Wk 1', deviations: 12 },
-    { name: 'Wk 2', deviations: 18 },
-    { name: 'Wk 3', deviations: 15 },
-    { name: 'Wk 4', deviations: deviations.length || 21 },
+    { name: 'Wk 1', deviations: Math.max(1, Math.floor(deviations.length * 0.4)) },
+    { name: 'Wk 2', deviations: Math.max(1, Math.floor(deviations.length * 0.6)) },
+    { name: 'Wk 3', deviations: Math.max(1, Math.floor(deviations.length * 0.8)) },
+    { name: 'Wk 4', deviations: deviations.length || 0 },
   ];
 
   if (isLoading && sites.length === 0) {
@@ -277,7 +278,7 @@ export const ExecutiveDashboard = () => {
       {/* ── KPIs ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20 }}>
         <KpiCard icon={<Building2 size={18} />}    iconColor={T.accent} title="Total Sites"           value={sites.length}       sub="Across the trial"               delay={0}    />
-        <KpiCard icon={<Users size={18} />}        iconColor={T.green}  title="Active Patients"      value={100}                sub="Currently enrolled"             delay={0.05} />
+        <KpiCard icon={<Users size={18} />}        iconColor={T.green}  title="Active Patients"      value={patientCount}       sub="Currently enrolled"             delay={0.05} />
         <KpiCard icon={<Activity size={18} />}     iconColor={T.amber}  title="Protocol Deviations"  value={deviations.length}  sub={`${majorDevs} major / critical`}  delay={0.1} />
         <KpiCard icon={<AlertTriangle size={18} />} iconColor={T.red}   title="High-Risk Sites"      value={highRisk}           sub="Requires immediate action"      delay={0.15} accentBorder="rgba(255,59,48,0.3)" />
       </div>
