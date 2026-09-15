@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <!-- Gradient Definitions -->
+    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00a396" />
+      <stop offset="45%" stop-color="#0e698b" />
+      <stop offset="100%" stop-color="#0a2540" />
+    </linearGradient>
+
+    <linearGradient id="lightTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14cba8" />
+      <stop offset="100%" stop-color="#0b7a8f" />
+    </linearGradient>
+
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0a2540" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <g filter="url(#dropShadow)">
+    <!-- Main Outer Shield -->
+    <path d="M 250 50 
+             C 295 68 345 68 395 82 
+             C 395 230 345 340 250 420 
+             C 155 340 105 230 105 82 
+             C 155 68 205 68 250 50 Z" 
+          fill="url(#shieldGradient)" />
+
+    <!-- Shield Inner White Frame Cutout -->
+    <path d="M 250 72 
+             C 288 88 332 88 372 100 
+             C 372 222 330 318 250 392 
+             C 170 318 128 222 128 100 
+             C 168 88 212 88 250 72 Z" 
+          fill="#ffffff" />
+
+    <!-- Medical Cross Background -->
+    <path d="M 220 135 H 280 V 190 H 335 V 250 H 280 V 305 H 220 V 250 H 165 V 190 H 220 Z" 
+          fill="#0c3859" opacity="0.95" />
+
+    <!-- Stylized "G" Element (Right Shield Ribbon Integration) -->
+    <path d="M 320 205 
+             C 350 205 365 225 365 255 
+             C 365 290 340 315 310 315 
+             L 310 285 
+             C 325 285 335 275 335 255 
+             C 335 240 328 230 315 230 
+             H 300 V 255 H 330 V 280 H 275 V 205 Z" 
+          fill="url(#shieldGradient)" opacity="0.9" />
+
+    <!-- DNA Strand 1 (Main Helix Curve) -->
+    <path d="M 175 305 C 210 280 235 240 260 200 C 285 160 310 130 335 110" 
+          fill="none" stroke="url(#lightTeal)" stroke-width="8" stroke-linecap="round" />
+
+    <!-- DNA Strand 2 (Back Helix Curve) -->
+    <path d="M 195 330 C 230 290 255 240 280 195 C 300 155 315 130 330 115" 
+          fill="none" stroke="#0a2540" stroke-width="6" stroke-linecap="round" />
+
+    <!-- DNA Cross-Rungs & Base Pairs -->
+    <line x1="185" y1="295" x2="210" y2="315" stroke="#14cba8" stroke-width="4.5" stroke-linecap="round" />
+    <line x1="215" y1="250" x2="242" y2="270" stroke="#14cba8" stroke-width="4.5" stroke-linecap="round" />
+    <line x1="245" y1="205" x2="272" y2="225" stroke="#14cba8" stroke-width="4.5" stroke-linecap="round" />
+    <line x1="275" y1="160" x2="300" y2="180" stroke="#14cba8" stroke-width="4.5" stroke-linecap="round" />
+
+    <!-- DNA Node Joints -->
+    <circle cx="185" cy="295" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="210" cy="315" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="215" cy="250" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="242" cy="270" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="245" cy="205" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="272" cy="225" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="275" cy="160" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="300" cy="180" r="7" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+    <circle cx="335" cy="110" r="8" fill="#14cba8" stroke="#0a2540" stroke-width="2" />
+  </g>
+</svg>

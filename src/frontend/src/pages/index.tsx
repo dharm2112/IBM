@@ -1,3 +1,4 @@
+export { default as LandingPage } from './LandingPage';
 export * from './ExecutiveDashboard';
 export * from './SiteRanking';
 export * from './SiteDetails';

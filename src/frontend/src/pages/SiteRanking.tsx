@@ -1,11 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { api } from '../api/client';
 import type { Site } from '../api/types';
 import { DataTable, RiskBadge } from '../components';
 import type { Column } from '../components/DataTable';
-import { Search, Calculator } from 'lucide-react';
+import { Search, Calculator, ArrowRight } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
+
+// ── Apple HIG Tokens ────────────────────────────────────────────────────────
+const T = {
+  bg:       '#F5F5F7',
+  surface:  '#ffffff',
+  surface2: '#F2F2F7',
+  border:   'rgba(0,0,0,0.07)',
+  borderLight: 'rgba(0,0,0,0.04)',
+  text:     '#1D1D1F',
+  sub:      '#6E6E73',
+  muted:    '#AEAEB2',
+  accent:   '#007AFF',
+  green:    '#34C759',
+  amber:    '#FF9500',
+  red:      '#FF3B30',
+};
 
 export const SiteRanking = () => {
   const navigate = useNavigate();
@@ -50,36 +67,38 @@ export const SiteRanking = () => {
   });
 
   const columns: Column<Site>[] = [
-    { key: 'rank', header: 'Rank', render: (s: Site) => <span className="font-semibold text-base-muted">{filteredSites.indexOf(s) + 1}</span> },
+    { key: 'rank', header: 'Rank', render: (s: Site) => <span style={{ fontWeight: 600, color: T.sub, fontSize: '13px' }}>{filteredSites.indexOf(s) + 1}</span> },
     { key: 'id', header: 'Site', render: (s: Site) => (
       <div>
-        <div className="font-medium text-base-ink">{s.site_name}</div>
-        <div className="font-mono text-xs text-base-secondary mt-0.5">{s.site_id}</div>
+        <div style={{ fontWeight: 500, color: T.text, fontSize: '13px' }}>{s.site_name}</div>
+        <div style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.sub, marginTop: '2px' }}>{s.site_id}</div>
       </div>
     ) },
-    { key: 'location', header: 'Location', render: (s: Site) => s.location },
-    { key: 'patients', header: 'Patients', render: (s: Site) => s.patient_count },
-    // Mock deviations count for demo purposes (can be expanded later)
-    { key: 'deviations', header: 'Deviations', render: () => Math.floor(Math.random() * 20) },
-    { key: 'major', header: 'Major', render: () => <span className="text-risk-high font-medium">{Math.floor(Math.random() * 5)}</span> },
+    { key: 'location', header: 'Location', render: (s: Site) => <span style={{ fontSize: '13px', color: T.sub }}>{s.location}</span> },
+    { key: 'patients', header: 'Patients', render: (s: Site) => <span style={{ fontSize: '13px', color: T.sub }}>{s.patient_count}</span> },
+    { key: 'deviations', header: 'Deviations', render: () => <span style={{ fontSize: '13px', color: T.text }}>{Math.floor(Math.random() * 20)}</span> },
+    { key: 'major', header: 'Major', render: () => <span style={{ color: T.red, fontWeight: 500, fontSize: '13px' }}>{Math.floor(Math.random() * 5)}</span> },
     { key: 'risk_score', header: 'Risk Score', render: (s: Site) => (
-      <div className="w-32 flex items-center space-x-2">
-        <span className="text-sm font-semibold w-8 text-right">{s.risk_score}</span>
-        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+      <div style={{ width: 120, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: '13px', fontWeight: 600, width: 28, textAlign: 'right', color: T.text }}>{s.risk_score}</span>
+        <div style={{ flex: 1, height: 4, background: T.surface2, borderRadius: 4, overflow: 'hidden' }}>
           <div 
-            className={`h-full rounded-full ${s.risk_level === 'HIGH' ? 'bg-risk-high' : s.risk_level === 'MEDIUM' ? 'bg-risk-medium' : 'bg-risk-low'}`}
-            style={{ width: `${s.risk_score}%` }}
+            style={{ 
+              height: '100%', 
+              borderRadius: 4,
+              background: s.risk_level === 'HIGH' ? T.red : s.risk_level === 'MEDIUM' ? T.amber : T.green,
+              width: `${s.risk_score}%`
+            }}
           />
         </div>
       </div>
     ) },
     { key: 'risk_level', header: 'Level', render: (s: Site) => <RiskBadge level={s.risk_level} /> },
     { key: 'trend', header: 'Trend', render: (s: Site) => {
-      // Generate a small dummy sparkline
       const data = Array.from({length: 5}, () => ({ v: Math.random() * 100 }));
-      const color = s.risk_level === 'HIGH' ? '#EF4444' : s.risk_level === 'MEDIUM' ? '#F59E0B' : '#10B981';
+      const color = s.risk_level === 'HIGH' ? T.red : s.risk_level === 'MEDIUM' ? T.amber : T.green;
       return (
-        <div className="w-16 h-8">
+        <div style={{ width: 64, height: 32 }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
               <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />
@@ -88,69 +107,85 @@ export const SiteRanking = () => {
         </div>
       );
     } },
+    { key: 'actions', header: '', render: () => <ArrowRight size={14} color={T.muted} /> }
   ];
 
   if (isLoading && sites.length === 0) {
-    return <div className="flex items-center justify-center h-64 text-base-secondary">Loading site data...</div>;
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 250, color: T.sub, fontSize: '13px' }}>Loading site data...</div>;
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 24, marginTop: -40 }} // Pull up to match layout
+    >
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold text-base-ink">Site Risk</h1>
-          <p className="text-sm text-base-secondary mt-2">Prioritized view of clinical trial sites.</p>
-        </div>
-        <div className="flex items-center space-x-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
           <button 
             onClick={handleRecalculate}
             disabled={isRecalculating}
-            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-base-ink hover:bg-black rounded-md transition-colors disabled:opacity-50"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 16px', height: 36, borderRadius: 10, border: 'none', background: T.accent, color: '#fff', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
           >
-            <Calculator size={16} className={isRecalculating ? "animate-spin" : ""} />
+            <Calculator size={14} style={isRecalculating ? { animation: 'spin 1s linear infinite' } : {}} />
             <span>Recalculate Risk</span>
           </button>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-1">
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-base-muted" size={16} />
-          <input 
-            type="text" 
-            placeholder="Search sites..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-base-border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-base-ink/20 focus:border-base-ink transition-shadow"
+      <div style={{ background: T.surface, borderRadius: 16, border: `1px solid ${T.border}`, padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Filter Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: 320 }}>
+            <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.muted }} size={16} />
+            <input 
+              type="text" 
+              placeholder="Search sites..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: '100%', padding: '0 16px 0 36px', height: 36, fontSize: '13px', border: 'none', background: T.surface2, borderRadius: 10, color: T.text, outline: 'none' }}
+            />
+          </div>
+          
+          {/* Segmented Control */}
+          <div style={{ display: 'flex', alignItems: 'center', background: T.surface2, borderRadius: 8, padding: 2 }}>
+            {(['ALL', 'LOW', 'MEDIUM', 'HIGH'] as const).map((risk) => (
+              <button
+                key={risk}
+                onClick={() => setFilterRisk(risk)}
+                style={{
+                  padding: '6px 16px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: 'none',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  background: filterRisk === risk ? T.surface : 'transparent',
+                  color: filterRisk === risk ? T.text : T.sub,
+                  boxShadow: filterRisk === risk ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {risk === 'ALL' ? 'All' : risk}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div style={{ margin: '0 -20px -20px -20px' }}>
+          <DataTable 
+            data={filteredSites} 
+            columns={columns} 
+            keyField="site_id"
+            onRowClick={(site: Site) => navigate(`/dashboard/sites/${site.site_id}`)}
           />
         </div>
-        
-        <div className="flex items-center space-x-2 bg-white border border-base-border rounded-md p-1">
-          {(['ALL', 'LOW', 'MEDIUM', 'HIGH'] as const).map((risk) => (
-            <button
-              key={risk}
-              onClick={() => setFilterRisk(risk)}
-              className={`px-4 py-1.5 text-xs font-medium rounded transition-colors ${
-                filterRisk === risk 
-                  ? 'bg-slate-100 text-base-ink shadow-sm' 
-                  : 'text-base-secondary hover:text-base-ink hover:bg-slate-50'
-              }`}
-            >
-              {risk === 'ALL' ? 'All' : risk}
-            </button>
-          ))}
-        </div>
       </div>
-
-      {/* Table */}
-      <DataTable 
-        data={filteredSites} 
-        columns={columns} 
-        keyField="site_id"
-        onRowClick={(site: Site) => navigate(`/sites/${site.site_id}`)}
-      />
-    </div>
+    </motion.div>
   );
 };
