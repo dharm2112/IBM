@@ -1,27 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: Inter, -apple-system, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif;
 
-  /* ── Light theme tokens (dashboard) ─────────── */
-  --color-base-bg:        #f8f9fb;
-  --color-base-ink:       #111827;
-  --color-base-secondary: #6b7280;
-  --color-base-muted:     #9ca3af;
-  --color-base-border:    #e5e7eb;
+  /* ── Apple HIG theme tokens ─────────── */
+  --color-base-bg:        #F5F5F7;
+  --color-base-ink:       #1D1D1F;
+  --color-base-secondary: #6E6E73;
+  --color-base-muted:     #AEAEB2;
+  --color-base-border:    rgba(0,0,0,0.07);
   --color-base-card:      #ffffff;
 
-  /* ── Risk colors ─────────────────────────────── */
-  --color-risk-low:      #10B981;
-  --color-risk-medium:   #F59E0B;
-  --color-risk-high:     #EF4444;
-  --color-risk-critical: #991B1B;
+  /* ── Apple System Colors ─────────────────────────────── */
+  --color-accent-blue:    #007AFF;
+  --color-risk-low:       #34C759; /* Success */
+  --color-risk-medium:    #FF9500; /* Warning */
+  --color-risk-high:      #FF3B30; /* Danger */
+  --color-risk-critical:  #FF3B30; /* Danger */
 
-  /* ── AI accent ───────────────────────────────── */
-  --color-ai-accent: rgba(99,102,241,0.08);
-  --color-ai-border: rgba(99,102,241,0.2);
-  --color-ai-text:   #6366f1;
+  /* ── AI accent (now using system blue) ───────────────── */
+  --color-ai-accent: rgba(0,122,255,0.08);
+  --color-ai-border: rgba(0,122,255,0.2);
+  --color-ai-text:   #007AFF;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -29,8 +30,8 @@
 html { scroll-behavior: smooth; }
 
 body {
-  background-color: #f8f9fb;
-  color: #111827;
+  background-color: var(--color-base-bg);
+  color: var(--color-base-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

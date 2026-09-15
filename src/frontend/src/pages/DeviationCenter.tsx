@@ -1,9 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { api } from '../api/client';
 import type { Deviation } from '../api/types';
 import { DataTable, SeverityBadge, StatCard, DetailDrawer, EvidencePanel } from '../components';
 import { Search } from 'lucide-react';
+
+// ── Apple HIG Tokens ────────────────────────────────────────────────────────
+const T = {
+  bg:       '#F5F5F7',
+  surface:  '#ffffff',
+  surface2: '#F2F2F7',
+  border:   'rgba(0,0,0,0.07)',
+  borderLight: 'rgba(0,0,0,0.04)',
+  text:     '#1D1D1F',
+  sub:      '#6E6E73',
+  muted:    '#AEAEB2',
+  accent:   '#007AFF',
+  green:    '#34C759',
+  amber:    '#FF9500',
+  red:      '#FF3B30',
+};
 
 export const DeviationCenter = () => {
   const navigate = useNavigate();
@@ -47,18 +64,23 @@ export const DeviationCenter = () => {
   });
 
   const columns = [
-    { key: 'id', header: 'Deviation ID', render: (d: Deviation) => <span className="font-mono text-xs font-semibold">{d.deviation_id}</span> },
-    { key: 'site', header: 'Site', render: (d: Deviation) => d.site_id },
-    { key: 'patient', header: 'Patient', render: (d: Deviation) => d.patient_id },
-    { key: 'rule', header: 'Rule', render: (d: Deviation) => d.rule_id },
-    { key: 'category', header: 'Category', render: (d: Deviation) => d.category },
+    { key: 'id', header: 'Deviation ID', render: (d: Deviation) => <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.text, fontWeight: 500 }}>{d.deviation_id}</span> },
+    { key: 'site', header: 'Site', render: (d: Deviation) => <span style={{ fontSize: '13px', color: T.sub }}>{d.site_id}</span> },
+    { key: 'patient', header: 'Patient', render: (d: Deviation) => <span style={{ fontSize: '13px', color: T.sub }}>{d.patient_id}</span> },
+    { key: 'rule', header: 'Rule', render: (d: Deviation) => <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.sub }}>{d.rule_id}</span> },
+    { key: 'category', header: 'Category', render: (d: Deviation) => <span style={{ fontSize: '13px', color: T.text }}>{d.category}</span> },
     { key: 'severity', header: 'Severity', render: (d: Deviation) => <SeverityBadge level={d.severity} /> },
-    { key: 'detected', header: 'Detected', render: (d: Deviation) => new Date(d.detected_at).toLocaleDateString() },
+    { key: 'detected', header: 'Detected', render: (d: Deviation) => <span style={{ fontSize: '13px', color: T.sub }}>{new Date(d.detected_at).toLocaleDateString()}</span> },
     { key: 'status', header: 'Status', render: (d: Deviation) => (
-      <span className={`text-xs font-medium px-2 py-1 rounded border ${
-        d.status === 'Open' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
-        'bg-green-50 text-green-700 border-green-200'
-      }`}>
+      <span style={{ 
+        fontSize: '10px', 
+        fontWeight: 500, 
+        padding: '2px 8px', 
+        borderRadius: 10,
+        textTransform: 'capitalize',
+        background: d.status === 'Open' ? '#FFF8E6' : '#E6F4EA',
+        color: d.status === 'Open' ? '#B26B00' : '#137333',
+      }}>
         {d.status}
       </span>
     )},
@@ -71,49 +93,54 @@ export const DeviationCenter = () => {
   const openDevs = deviations.filter(d => d.status === 'Open').length;
 
   if (isLoading && deviations.length === 0) {
-    return <div className="flex items-center justify-center h-64 text-base-secondary">Loading deviations...</div>;
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 250, color: T.sub, fontSize: '13px' }}>Loading deviations...</div>;
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 24, marginTop: -40 }} // Pull up to match layout
+    >
       {/* Header Section */}
-      <div className="border-b border-base-border pb-6">
-        <h1 className="text-3xl font-semibold text-base-ink">Protocol Deviations</h1>
-        <p className="text-sm text-base-secondary mt-2">
-          <strong className="text-base-ink font-medium">{totalDevs} detected deviations.</strong> Review deviations detected by approved protocol rules.
+      <div style={{ paddingBottom: 24, borderBottom: `1px solid ${T.border}` }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 600, color: T.text, margin: 0, letterSpacing: '-0.01em' }}>Protocol Deviations</h1>
+        <p style={{ fontSize: '13px', color: T.sub, margin: '8px 0 0 0' }}>
+          <strong style={{ color: T.text, fontWeight: 500 }}>{totalDevs} detected deviations.</strong> Review deviations detected by approved protocol rules.
         </p>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatCard title="Total" value={totalDevs} className="p-4" />
-        <StatCard title="Critical" value={criticalDevs} className="p-4 border-risk-high/30" />
-        <StatCard title="Major" value={majorDevs} className="p-4" />
-        <StatCard title="Minor" value={minorDevs} className="p-4" />
-        <StatCard title="Open" value={openDevs} className="p-4" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
+        <StatCard title="Total" value={totalDevs} />
+        <StatCard title="Critical" value={criticalDevs} style={criticalDevs > 0 ? { border: `1px solid rgba(255,59,48,0.3)` } : {}} />
+        <StatCard title="Major" value={majorDevs} />
+        <StatCard title="Minor" value={minorDevs} />
+        <StatCard title="Open" value={openDevs} />
       </div>
 
-      {/* Filters Section */}
-      <div className="bg-base-card border border-base-border rounded-lg p-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-base-muted" size={16} />
+      {/* Filters & Table Section */}
+      <div style={{ background: T.surface, borderRadius: 16, border: `1px solid ${T.border}`, padding: '20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: 400 }}>
+            <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.muted }} size={16} />
             <input 
               type="text" 
               placeholder="Search deviation ID, site, patient or rule..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-base-border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-base-ink/20 focus:border-base-ink transition-shadow"
+              style={{ width: '100%', padding: '0 16px 0 36px', height: 36, fontSize: '13px', border: 'none', background: T.surface2, borderRadius: 10, color: T.text, outline: 'none' }}
             />
           </div>
           
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold text-base-secondary uppercase tracking-wider">Severity</span>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Severity</span>
               <select 
-                className="text-sm border border-base-border rounded-md bg-white py-1.5 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-base-ink/20 focus:border-base-ink"
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value)}
+                style={{ height: 36, padding: '0 32px 0 12px', fontSize: '13px', background: T.surface2, border: 'none', borderRadius: 8, color: T.text, outline: 'none', appearance: 'none' }}
               >
                 <option value="All">All</option>
                 <option value="CRITICAL">Critical</option>
@@ -122,12 +149,12 @@ export const DeviationCenter = () => {
               </select>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold text-base-secondary uppercase tracking-wider">Status</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</span>
               <select 
-                className="text-sm border border-base-border rounded-md bg-white py-1.5 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-base-ink/20 focus:border-base-ink"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ height: 36, padding: '0 32px 0 12px', fontSize: '13px', background: T.surface2, border: 'none', borderRadius: 8, color: T.text, outline: 'none', appearance: 'none' }}
               >
                 <option value="All">All</option>
                 <option value="Open">Open</option>
@@ -135,12 +162,12 @@ export const DeviationCenter = () => {
               </select>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold text-base-secondary uppercase tracking-wider">Category</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Category</span>
               <select 
-                className="text-sm border border-base-border rounded-md bg-white py-1.5 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-base-ink/20 focus:border-base-ink"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
+                style={{ height: 36, padding: '0 32px 0 12px', fontSize: '13px', background: T.surface2, border: 'none', borderRadius: 8, color: T.text, outline: 'none', appearance: 'none' }}
               >
                 <option value="All">All</option>
                 <option value="Visit Schedule">Visit Schedule</option>
@@ -150,26 +177,37 @@ export const DeviationCenter = () => {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Table */}
-      <DataTable 
-        data={filteredDeviations} 
-        columns={columns} 
-        keyField="deviation_id"
-        onRowClick={(dev) => setSelectedDeviation(dev)}
-      />
+        {/* Table */}
+        <div style={{ margin: '0 -20px -20px -20px' }}>
+          <DataTable 
+            data={filteredDeviations} 
+            columns={columns} 
+            keyField="deviation_id"
+            onRowClick={(dev) => setSelectedDeviation(dev)}
+          />
+        </div>
+      </div>
 
       {/* Detail Drawer */}
       <DetailDrawer
         isOpen={!!selectedDeviation}
         onClose={() => setSelectedDeviation(null)}
         title={
-          <div className="flex items-center space-x-3">
-            <span className="font-mono text-sm">{selectedDeviation?.deviation_id}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '14px', color: T.text, fontWeight: 600 }}>{selectedDeviation?.deviation_id}</span>
             {selectedDeviation && <SeverityBadge level={selectedDeviation.severity} />}
             {selectedDeviation && (
-              <span className="text-xs font-medium px-2 py-0.5 rounded border bg-slate-100 text-slate-700 border-slate-200">
+              <span style={{ 
+                fontSize: '10px', 
+                fontWeight: 600, 
+                padding: '2px 8px', 
+                borderRadius: 10,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                background: T.surface2,
+                color: T.sub,
+              }}>
                 {selectedDeviation.status}
               </span>
             )}
@@ -177,41 +215,45 @@ export const DeviationCenter = () => {
         }
       >
         {selectedDeviation && (
-          <div className="space-y-8">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: 24 }}>
             <div>
-              <h3 className="text-xs font-semibold text-base-muted uppercase tracking-wider mb-3">Overview</h3>
-              <p className="text-sm text-base-ink leading-relaxed bg-slate-50 p-4 rounded-lg border border-base-border">
+              <h3 style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px 0' }}>Overview</h3>
+              <p style={{ fontSize: '13px', color: T.text, lineHeight: 1.5, margin: 0, padding: 16, background: T.surface2, borderRadius: 12 }}>
                 {selectedDeviation.description}
               </p>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div 
-                className="p-4 bg-white rounded-lg border border-base-border shadow-sm cursor-pointer hover:border-base-ink transition-colors group"
+                style={{ padding: '12px 16px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.2s' }}
                 onClick={() => navigate(`/dashboard/sites/${selectedDeviation.site_id}`)}
+                onMouseOver={(e) => e.currentTarget.style.borderColor = T.muted}
+                onMouseOut={(e) => e.currentTarget.style.borderColor = T.border}
               >
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1 group-hover:text-base-ink transition-colors">Site</span>
-                <span className="font-medium text-sm text-base-ink">{selectedDeviation.site_id}</span>
+                <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Site</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: T.text }}>{selectedDeviation.site_id}</span>
               </div>
               <div 
-                className="p-4 bg-white rounded-lg border border-base-border shadow-sm cursor-pointer hover:border-base-ink transition-colors group"
+                style={{ padding: '12px 16px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.2s' }}
                 onClick={() => navigate(`/dashboard/patients/${selectedDeviation.patient_id}`)}
+                onMouseOver={(e) => e.currentTarget.style.borderColor = T.muted}
+                onMouseOut={(e) => e.currentTarget.style.borderColor = T.border}
               >
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1 group-hover:text-base-ink transition-colors">Patient</span>
-                <span className="font-medium text-sm text-base-ink">{selectedDeviation.patient_id}</span>
+                <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Patient</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: T.text }}>{selectedDeviation.patient_id}</span>
               </div>
-              <div className="p-4 bg-white rounded-lg border border-base-border shadow-sm">
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Visit</span>
-                <span className="font-medium text-sm text-base-ink">{selectedDeviation.visit_id}</span>
+              <div style={{ padding: '12px 16px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12 }}>
+                <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Visit</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: T.text }}>{selectedDeviation.visit_id}</span>
               </div>
-              <div className="p-4 bg-white rounded-lg border border-base-border shadow-sm">
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Rule</span>
-                <span className="font-mono text-sm text-base-ink">{selectedDeviation.rule_id}</span>
+              <div style={{ padding: '12px 16px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12 }}>
+                <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Rule</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: T.text, fontFamily: 'SF Mono, monospace' }}>{selectedDeviation.rule_id}</span>
               </div>
             </div>
 
             <div>
-              <h3 className="text-xs font-semibold text-base-muted uppercase tracking-wider mb-3">Evidence</h3>
+              <h3 style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px 0' }}>Evidence</h3>
               <EvidencePanel 
                 expected={selectedDeviation.expected} 
                 actual={selectedDeviation.actual} 
@@ -219,24 +261,24 @@ export const DeviationCenter = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4 border-t border-base-border pt-6">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, paddingTop: 24, borderTop: `1px solid ${T.border}` }}>
               <div>
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Protocol Reference</span>
-                <span className="font-medium text-sm text-base-ink hover:underline cursor-pointer">Section 5.2</span>
+                <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Protocol Reference</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: T.text, textDecoration: 'underline', cursor: 'pointer' }}>Section 5.2</span>
               </div>
               <div>
-                <span className="text-xs text-base-muted uppercase tracking-wider block mb-1">Detected At</span>
-                <span className="font-medium text-sm text-base-ink">{new Date(selectedDeviation.detected_at).toLocaleString()}</span>
+                <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Detected At</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: T.text }}>{new Date(selectedDeviation.detected_at).toLocaleString()}</span>
               </div>
             </div>
             
-            <div className="pt-8">
+            <div style={{ paddingTop: 32 }}>
               <button 
                 onClick={() => {
                   setSelectedDeviation(null);
                   navigate('/dashboard/capa');
                 }}
-                className="w-full py-3 bg-base-ink hover:bg-black text-white text-sm font-medium rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-base-ink"
+                style={{ width: '100%', padding: '0 16px', height: 36, background: T.accent, color: '#fff', border: 'none', borderRadius: 10, fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
               >
                 Generate CAPA
               </button>
@@ -245,6 +287,6 @@ export const DeviationCenter = () => {
         )}
       </DetailDrawer>
 
-    </div>
+    </motion.div>
   );
 };

@@ -1,42 +1,78 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../api/mock';
+import { motion } from 'motion/react';
+import { api } from '../api/client';
 import type { ProtocolRule } from '../api/types';
 import { SeverityBadge, AIBanner, ApprovalActions, DetailDrawer, Folder } from '../components';
-import { Upload, Search, CheckCircle, Clock, Loader2, Sparkles } from 'lucide-react';
+import { Upload, Search, CheckCircle, Clock, Loader2, Sparkles, X } from 'lucide-react';
+
+// ── Apple HIG Tokens ────────────────────────────────────────────────────────
+const T = {
+  bg:       '#F5F5F7',
+  surface:  '#ffffff',
+  surface2: '#F2F2F7',
+  border:   'rgba(0,0,0,0.07)',
+  borderLight: 'rgba(0,0,0,0.04)',
+  text:     '#1D1D1F',
+  sub:      '#6E6E73',
+  muted:    '#AEAEB2',
+  accent:   '#007AFF',
+  green:    '#34C759',
+  amber:    '#FF9500',
+  red:      '#FF3B30',
+  blueBg:   '#F0F8FF',
+  greenBg:  '#E6F4EA',
+  redBg:    '#FCE8E6',
+  amberBg:  '#FFF8E6',
+};
 
 // ─── Rule Card ────────────────────────────────────────────────────────────────
 const RuleCard: React.FC<{ rule: ProtocolRule; onClick: () => void }> = ({ rule, onClick }) => {
-  const statusStyles: Record<string, string> = {
-    APPROVED: 'bg-green-50 text-green-700 border-green-200',
-    PENDING:  'bg-amber-50 text-amber-700 border-amber-200',
-    REJECTED: 'bg-red-50 text-red-700 border-red-200',
+  const statusStyles: Record<string, any> = {
+    APPROVED: { bg: T.greenBg, color: '#137333' },
+    PENDING:  { bg: T.amberBg, color: '#B26B00' },
+    REJECTED: { bg: T.redBg, color: '#C5221F' },
   };
 
   return (
     <div
       onClick={onClick}
-      className="bg-base-card border border-base-border rounded-lg p-5 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group"
+      style={{
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: 12,
+        padding: 20,
+        cursor: 'pointer',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        transition: 'border-color 0.2s',
+      }}
+      onMouseOver={(e) => e.currentTarget.style.borderColor = T.muted}
+      onMouseOut={(e) => e.currentTarget.style.borderColor = T.border}
     >
-      <div className="flex items-start justify-between mb-3">
-        <span className="font-mono text-xs text-base-muted">{rule.rule_id}</span>
-        <div className="flex items-center space-x-2">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.muted }}>{rule.rule_id}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <SeverityBadge level={rule.severity || 'MINOR'} />
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${statusStyles[rule.approval_status]}`}>
+          <span style={{ 
+            display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+            background: statusStyles[rule.approval_status]?.bg || T.surface2,
+            color: statusStyles[rule.approval_status]?.color || T.sub,
+            textTransform: 'uppercase', letterSpacing: '0.04em'
+          }}>
             {rule.approval_status === 'APPROVED' ? (
-              <span className="flex items-center gap-1"><CheckCircle size={10} /> Approved</span>
+              <><CheckCircle size={10} /> APPROVED</>
             ) : rule.approval_status === 'PENDING' ? (
-              <span className="flex items-center gap-1"><Clock size={10} /> Pending</span>
-            ) : 'Rejected'}
+              <><Clock size={10} /> PENDING</>
+            ) : 'REJECTED'}
           </span>
         </div>
       </div>
 
-      <h3 className="text-base font-semibold text-base-ink mb-1 group-hover:text-black transition-colors">{rule.name}</h3>
-      <p className="text-sm text-base-secondary mb-4 line-clamp-2">{rule.description}</p>
+      <h3 style={{ fontSize: '13px', fontWeight: 600, color: T.text, margin: '0 0 4px 0', lineHeight: 1.4 }}>{rule.name}</h3>
+      <p style={{ fontSize: '11px', color: T.sub, margin: '0 0 16px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rule.description}</p>
 
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded border border-slate-200">{rule.category}</span>
-        <span className="text-xs text-base-muted">{rule.protocol_reference}</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', background: T.surface2, color: T.sub, borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{rule.category}</span>
+        <span style={{ fontSize: '11px', color: T.muted }}>{rule.protocol_reference}</span>
       </div>
     </div>
   );
@@ -63,51 +99,57 @@ const UploadPanel: React.FC<{ onUpload: (file: File) => Promise<void> }> = ({ on
   };
 
   return (
-    <div className="bg-ai-accent border border-ai-border rounded-lg p-6">
-      <div className="flex items-center space-x-3 mb-4">
-        <Sparkles size={16} className="text-ai-text" />
-        <h3 className="font-semibold text-base-ink">Upload Protocol Document</h3>
-        <span className="text-xs text-base-muted">— IBM watsonx.ai will auto-extract rules</span>
+    <div style={{ background: T.surface, border: `1px solid rgba(0,122,255,0.3)`, borderRadius: 16, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: T.blueBg, borderBottom: `1px solid rgba(0,122,255,0.1)` }}>
+        <Sparkles size={16} color={T.accent} />
+        <h3 style={{ fontSize: '13px', fontWeight: 600, color: T.text, margin: 0 }}>Upload Protocol Document</h3>
+        <span style={{ fontSize: '11px', color: T.sub }}>— IBM watsonx.ai will auto-extract rules</span>
       </div>
 
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all flex flex-col items-center justify-center ${
-          isDragging ? 'border-base-ink bg-white/70 shadow-inner' : 'border-ai-border bg-white/40 hover:bg-white/60'
-        }`}
+        style={{ 
+          margin: 20, padding: 32, textAlign: 'center', border: `2px dashed ${isDragging ? T.accent : T.border}`, borderRadius: 12, background: isDragging ? T.blueBg : T.surface, transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+        }}
       >
         {isUploading ? (
-          <div className="flex flex-col items-center space-y-3 py-4">
-            <Loader2 size={32} className="text-ai-text animate-spin" />
-            <p className="text-sm font-medium text-base-ink animate-pulse">watsonx.ai is extracting protocol rules...</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '16px 0' }}>
+            <Loader2 size={24} color={T.accent} style={{ animation: 'spin 1s linear infinite' }} />
+            <p style={{ fontSize: '13px', fontWeight: 500, color: T.text, margin: 0, animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>watsonx.ai is extracting protocol rules...</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center">
-            <div className="mb-2 h-44 flex items-center justify-center">
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ marginBottom: 12, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Folder size="sm" color="black" open={isDragging} />
             </div>
-            <p className="text-sm font-medium text-base-ink mb-1">Drop your protocol PDF here</p>
-            <p className="text-xs text-base-muted mb-4">or click to browse</p>
-            <label className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2 bg-base-ink text-white text-sm font-medium rounded-md hover:bg-black transition-all shadow-sm hover:shadow">
+            <p style={{ fontSize: '13px', fontWeight: 600, color: T.text, margin: '0 0 4px 0' }}>Drop your protocol PDF here</p>
+            <p style={{ fontSize: '11px', color: T.sub, margin: '0 0 16px 0' }}>or click to browse</p>
+            <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: 36, background: T.text, color: '#fff', fontSize: '13px', fontWeight: 500, borderRadius: 10, transition: 'background 0.2s' }}>
               <Upload size={14} />
               <span>Browse File</span>
               <input
                 type="file"
                 accept=".pdf,.docx,.txt"
-                className="sr-only"
+                style={{ display: 'none' }}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
               />
             </label>
             {lastUploaded && (
-              <p className="mt-4 text-xs text-risk-low flex items-center justify-center gap-1 bg-green-50 px-3 py-1.5 rounded-md border border-green-200">
-                <CheckCircle size={12} /> Rule extracted from <strong>{lastUploaded}</strong> — review below
+              <p style={{ marginTop: 16, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: T.greenBg, padding: '6px 12px', borderRadius: 8, border: `1px solid rgba(52,199,89,0.2)`, color: '#137333', margin: '16px 0 0 0' }}>
+                <CheckCircle size={12} /> Rule extracted from <strong style={{ fontWeight: 600, margin: '0 4px' }}>{lastUploaded}</strong> — review below
               </p>
             )}
           </div>
         )}
       </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: .5; }
+        }
+      `}</style>
     </div>
   );
 };
@@ -121,45 +163,46 @@ const RuleDetail: React.FC<{
   const isAiExtracted = rule.category === 'Extracted';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <SeverityBadge level={rule.severity || 'MINOR'} />
-        <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded border border-slate-200">{rule.category}</span>
-        <span className="text-xs text-base-muted">{rule.protocol_reference}</span>
+        <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', background: T.surface2, color: T.sub, borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{rule.category}</span>
+        <span style={{ fontSize: '11px', color: T.muted }}>{rule.protocol_reference}</span>
       </div>
 
       {isAiExtracted && (
-        <AIBanner>
-          <p className="text-sm text-base-ink">
+        <div style={{ padding: 16, background: T.blueBg, border: `1px solid rgba(0,122,255,0.2)`, borderRadius: 12, display: 'flex', gap: 12 }}>
+          <Sparkles size={16} color={T.accent} style={{ flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: '13px', color: T.text, margin: 0, lineHeight: 1.5 }}>
             This rule was <strong>auto-extracted by IBM watsonx.ai</strong> from your uploaded protocol document. Review the condition and threshold below before approving for use in deviation detection.
           </p>
-        </AIBanner>
+        </div>
       )}
 
       <div>
-        <h3 className="text-xs font-semibold text-base-muted uppercase tracking-wider mb-2">Description</h3>
-        <p className="text-sm text-base-ink leading-relaxed bg-slate-50 p-4 rounded-lg border border-base-border">{rule.description}</p>
+        <h3 style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px 0' }}>Description</h3>
+        <p style={{ fontSize: '13px', color: T.text, lineHeight: 1.5, margin: 0, padding: 16, background: T.surface2, borderRadius: 12 }}>{rule.description}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-          <span className="text-xs text-base-muted uppercase tracking-wider block mb-2">Condition</span>
-          <code className="text-sm font-mono text-base-ink break-all">{rule.condition}</code>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ padding: 16, background: T.surface2, borderRadius: 12 }}>
+          <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Condition</span>
+          <code style={{ fontSize: '11px', fontFamily: 'SF Mono, monospace', color: T.text, wordBreak: 'break-all' }}>{rule.condition}</code>
         </div>
-        <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-          <span className="text-xs text-base-muted uppercase tracking-wider block mb-2">Threshold</span>
-          <code className="text-sm font-mono text-base-ink">{rule.threshold}</code>
+        <div style={{ padding: 16, background: T.surface2, borderRadius: 12 }}>
+          <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Threshold</span>
+          <code style={{ fontSize: '11px', fontFamily: 'SF Mono, monospace', color: T.text }}>{rule.threshold}</code>
         </div>
       </div>
 
-      <div className="p-4 bg-slate-50 rounded-lg border border-base-border">
-        <span className="text-xs text-base-muted uppercase tracking-wider block mb-2">Protocol Reference</span>
-        <p className="text-sm font-medium text-base-ink">{rule.protocol_reference}</p>
+      <div style={{ padding: 16, background: T.surface2, borderRadius: 12 }}>
+        <span style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Protocol Reference</span>
+        <p style={{ fontSize: '13px', fontWeight: 500, color: T.text, margin: 0 }}>{rule.protocol_reference}</p>
       </div>
 
       {rule.approval_status === 'PENDING' && (
-        <div className="pt-4 border-t border-base-border">
-          <p className="text-xs text-base-muted mb-3">This rule is pending review. Approve to activate it in the deviation detection engine.</p>
+        <div style={{ paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+          <p style={{ fontSize: '11px', color: T.muted, margin: '0 0 12px 0' }}>This rule is pending review. Approve to activate it in the deviation detection engine.</p>
           <ApprovalActions
             onApprove={onApprove}
             onReject={onReject}
@@ -169,9 +212,9 @@ const RuleDetail: React.FC<{
       )}
 
       {rule.approval_status === 'APPROVED' && (
-        <div className="flex items-center space-x-2 text-sm font-medium text-risk-low p-4 bg-green-50 rounded-lg border border-green-200">
-          <CheckCircle size={16} />
-          <span>This rule is active in the deviation detection engine.</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, background: T.greenBg, border: `1px solid rgba(52,199,89,0.2)`, borderRadius: 12 }}>
+          <CheckCircle size={16} color="#137333" />
+          <span style={{ fontSize: '13px', fontWeight: 500, color: '#137333' }}>This rule is active in the deviation detection engine.</span>
         </div>
       )}
     </div>
@@ -231,31 +274,36 @@ export const ProtocolRuleViewer = () => {
   const pendingCount  = rules.filter((r) => r.approval_status === 'PENDING').length;
 
   if (isLoading && rules.length === 0) {
-    return <div className="flex items-center justify-center h-64 text-base-secondary">Loading protocol rules...</div>;
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 250, color: T.sub, fontSize: '13px' }}>Loading protocol rules...</div>;
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 24, marginTop: -40 }}
+    >
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-base-border pb-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 24, borderBottom: `1px solid ${T.border}` }}>
         <div>
-          <h1 className="text-3xl font-semibold text-base-ink">Protocol Rules</h1>
-          <p className="text-sm text-base-secondary mt-2">
-            <strong className="text-base-ink font-medium">{approvedCount} active</strong> rules · {pendingCount} pending review
+          <h1 style={{ fontSize: '28px', fontWeight: 600, color: T.text, margin: 0, letterSpacing: '-0.01em' }}>Protocol Rules</h1>
+          <p style={{ fontSize: '13px', color: T.sub, margin: '8px 0 0 0' }}>
+            <strong style={{ color: T.text, fontWeight: 500 }}>{approvedCount} active</strong> rules · {pendingCount} pending review
           </p>
         </div>
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {[
           { label: 'Total Rules', value: rules.length },
           { label: 'Active',      value: approvedCount },
           { label: 'Pending',     value: pendingCount  },
         ].map((k) => (
-          <div key={k.label} className="bg-base-card border border-base-border rounded-lg p-4">
-            <span className="text-xs text-base-muted block mb-1">{k.label}</span>
-            <span className="text-2xl font-semibold text-base-ink">{k.value}</span>
+          <div key={k.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            <span style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 12 }}>{k.label}</span>
+            <span style={{ fontSize: '34px', fontWeight: 300, color: T.text, lineHeight: 1, letterSpacing: '-0.02em' }}>{k.value}</span>
           </div>
         ))}
       </div>
@@ -264,35 +312,38 @@ export const ProtocolRuleViewer = () => {
       <UploadPanel onUpload={handleUpload} />
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-base-muted" size={16} />
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1 1 300px', maxWidth: 400 }}>
+          <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.muted }} size={16} />
           <input
             type="text"
             placeholder="Search rules..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-base-border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-base-ink/20 focus:border-base-ink transition-shadow"
+            style={{ width: '100%', height: 36, padding: '0 16px 0 36px', fontSize: '13px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, outline: 'none' }}
           />
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="text-sm border border-base-border rounded-md bg-white py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-base-ink/20"
+            style={{ height: 36, padding: '0 32px 0 12px', fontSize: '13px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, outline: 'none', appearance: 'auto' }}
           >
             {categories.map((c) => <option key={c}>{c}</option>)}
           </select>
 
-          <div className="flex items-center bg-white border border-base-border rounded-md p-1">
+          <div style={{ display: 'flex', alignItems: 'center', background: T.surface2, borderRadius: 8, padding: 2 }}>
             {['All', 'APPROVED', 'PENDING'].map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                  statusFilter === s ? 'bg-slate-100 text-base-ink shadow-sm' : 'text-base-secondary hover:text-base-ink'
-                }`}
+                style={{
+                  height: 32, padding: '0 12px', fontSize: '11px', fontWeight: 600, border: 'none', borderRadius: 6, cursor: 'pointer', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.04em',
+                  background: statusFilter === s ? T.surface : 'transparent',
+                  color: statusFilter === s ? T.text : T.sub,
+                  boxShadow: statusFilter === s ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                }}
               >
                 {s === 'All' ? 'All' : s === 'APPROVED' ? 'Active' : 'Pending'}
               </button>
@@ -302,37 +353,49 @@ export const ProtocolRuleViewer = () => {
       </div>
 
       {/* Rules Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
         {filtered.map((rule) => (
           <RuleCard key={rule.rule_id} rule={rule} onClick={() => setSelectedRule(rule)} />
         ))}
         {filtered.length === 0 && (
-          <div className="col-span-3 py-16 text-center text-base-muted text-sm">No rules match your filters.</div>
+          <div style={{ gridColumn: '1 / -1', padding: 64, textAlign: 'center', fontSize: '13px', color: T.muted }}>No rules match your filters.</div>
         )}
       </div>
 
-      {/* Detail Drawer */}
-      <DetailDrawer
-        isOpen={!!selectedRule}
-        onClose={() => setSelectedRule(null)}
-        title={
-          selectedRule && (
-            <div>
-              <span className="font-mono text-xs text-base-muted block mb-1">{selectedRule.rule_id}</span>
-              <h2 className="text-base font-semibold text-base-ink">{selectedRule.name}</h2>
-            </div>
-          )
-        }
-        footer={undefined}
-      >
-        {selectedRule && (
-          <RuleDetail
-            rule={selectedRule}
-            onApprove={() => handleApprove(selectedRule.rule_id)}
-            onReject={() => handleReject(selectedRule.rule_id)}
+      {/* Detail Drawer Side Panel */}
+      {selectedRule && (
+        <>
+          <div 
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(4px)', zIndex: 40 }}
+            onClick={() => setSelectedRule(null)} 
           />
-        )}
-      </DetailDrawer>
-    </div>
+          <motion.div 
+            initial={{ x: 400, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 400, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 560, background: T.surface, boxShadow: '-4px 0 24px rgba(0,0,0,0.1)', zIndex: 50, display: 'flex', flexDirection: 'column', borderLeft: `1px solid ${T.border}` }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: `1px solid ${T.border}`, background: T.surface }}>
+              <div>
+                <span style={{ fontFamily: 'SF Mono, monospace', fontSize: '11px', color: T.muted, display: 'block', marginBottom: 4 }}>{selectedRule.rule_id}</span>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, color: T.text, margin: 0, letterSpacing: '-0.01em' }}>{selectedRule.name}</h2>
+              </div>
+              <button onClick={() => setSelectedRule(null)} style={{ background: 'none', border: 'none', padding: 8, cursor: 'pointer', color: T.sub, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+              <RuleDetail
+                rule={selectedRule}
+                onApprove={() => handleApprove(selectedRule.rule_id)}
+                onReject={() => handleReject(selectedRule.rule_id)}
+              />
+            </div>
+          </motion.div>
+        </>
+      )}
+    </motion.div>
   );
 };
