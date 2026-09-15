@@ -25,6 +25,7 @@ class TrialGuardRuleEngine:
         self,
         rules_path: Optional[Union[str, Path]] = None,
         protocol_path: Optional[Union[str, Path]] = None,
+        active_rule_ids: Optional[List[str]] = None,
     ):
         base_dir = Path(__file__).resolve().parents[2]
 
@@ -52,6 +53,7 @@ class TrialGuardRuleEngine:
 
         self.rules: Dict[str, Dict[str, Any]] = {}
         self.protocol_meta: Dict[str, Any] = {}
+        self.active_rule_ids = active_rule_ids
         self._load_rules()
 
     def _load_rules(self) -> None:
@@ -63,7 +65,10 @@ class TrialGuardRuleEngine:
             rules_data = json.load(f)
 
         rule_list = rules_data.get("rules", [])
-        self.rules = {r["rule_id"]: r for r in rule_list}
+        if self.active_rule_ids is not None:
+            self.rules = {r["rule_id"]: r for r in rule_list if r["rule_id"] in self.active_rule_ids}
+        else:
+            self.rules = {r["rule_id"]: r for r in rule_list}
 
         if self.protocol_path and self.protocol_path.exists():
             with open(self.protocol_path, "r", encoding="utf-8") as f:

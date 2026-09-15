@@ -100,7 +100,7 @@ class WatsonxConfig:
     )
     model_id: str = field(
         default_factory=lambda: os.environ.get(
-            "WATSONX_MODEL_ID", "ibm/granite-13b-instruct-v2"
+            "WATSONX_MODEL_ID", "meta-llama/llama-3-3-70b-instruct"
         )
     )
 

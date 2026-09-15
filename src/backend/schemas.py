@@ -56,6 +56,7 @@ class ExtractProtocolResponse(BaseModel):
     """
 
     rule_count: int
+    protocol_id: str
     rules: list[dict[str, Any]]
     warnings: list[str]
     human_review_required: bool = True
@@ -256,6 +257,10 @@ class RunEngineRequest(BaseModel):
     random_seed: int = Field(
         default=42,
         description="RNG seed for reproducible dataset generation.",
+    )
+    protocol_id: str | None = Field(
+        default=None,
+        description="Optional protocol ID to filter rules. If not provided, the default protocol is used.",
     )
 
 

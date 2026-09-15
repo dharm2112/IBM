@@ -72,7 +72,11 @@ const RuleCard: React.FC<{ rule: ProtocolRule; onClick: () => void }> = ({ rule,
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', background: T.surface2, color: T.sub, borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{rule.category}</span>
-        <span style={{ fontSize: '11px', color: T.muted }}>{rule.protocol_reference}</span>
+        {rule.mapping && rule.mapping.mapping_status === 'approved' ? (
+          <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', background: T.greenBg, color: '#137333', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Executable</span>
+        ) : (
+          <span style={{ fontSize: '11px', color: T.muted }}>{rule.protocol_reference}</span>
+        )}
       </div>
     </div>
   );
@@ -215,7 +219,7 @@ const RuleDetail: React.FC<{
 
       {rule.approval_status === 'PENDING' && (
         <div style={{ paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
-          <p style={{ fontSize: '11px', color: T.muted, margin: '0 0 12px 0' }}>This rule is pending review. Approve to activate it in the deviation detection engine.</p>
+          <p style={{ fontSize: '11px', color: T.muted, margin: '0 0 12px 0' }}>This rule is pending review. Approve to activate it for mapping.</p>
           <ApprovalActions
             onApprove={onApprove}
             onReject={onReject}
@@ -224,10 +228,40 @@ const RuleDetail: React.FC<{
         </div>
       )}
 
-      {rule.approval_status === 'APPROVED' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, background: T.greenBg, border: `1px solid rgba(52,199,89,0.2)`, borderRadius: 12 }}>
-          <CheckCircle size={16} color="#137333" />
-          <span style={{ fontSize: '13px', fontWeight: 500, color: '#137333' }}>This rule is active in the deviation detection engine.</span>
+      {rule.approval_status === 'APPROVED' && rule.mapping && (
+        <div style={{ paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+          <h3 style={{ fontSize: '10px', fontWeight: 600, color: T.sub, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px 0' }}>AI Rule Mapping Suggestion</h3>
+          <div style={{ padding: 16, background: T.surface2, borderRadius: 12, marginBottom: 12 }}>
+            <p style={{ fontSize: '12px', color: T.text, margin: '0 0 8px 0' }}><strong>Canonical Rule ID:</strong> {rule.mapping.canonical_rule_id || 'None'}</p>
+            <p style={{ fontSize: '12px', color: T.text, margin: '0 0 8px 0' }}><strong>Reason:</strong> {rule.mapping.mapping_reason}</p>
+            <p style={{ fontSize: '12px', color: T.text, margin: 0 }}><strong>Mapping Status:</strong> {rule.mapping.mapping_status.toUpperCase()}</p>
+          </div>
+          
+          {rule.mapping.mapping_status === 'pending' && (
+            <div>
+              <p style={{ fontSize: '11px', color: T.muted, margin: '0 0 12px 0' }}>Approve this mapping to make the rule executable in the deterministic engine.</p>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  onClick={() => api.updateRuleMapping(rule.rule_id, 'approved').then(() => window.location.reload())}
+                  style={{ flex: 1, height: 36, borderRadius: 8, border: 'none', background: T.greenBg, color: '#137333', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Approve Mapping
+                </button>
+                <button
+                  onClick={() => api.updateRuleMapping(rule.rule_id, 'rejected').then(() => window.location.reload())}
+                  style={{ flex: 1, height: 36, borderRadius: 8, border: 'none', background: T.redBg, color: '#C5221F', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Reject Mapping
+                </button>
+              </div>
+            </div>
+          )}
+          {rule.mapping.mapping_status === 'approved' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, background: T.greenBg, border: `1px solid rgba(52,199,89,0.2)`, borderRadius: 12 }}>
+              <CheckCircle size={16} color="#137333" />
+              <span style={{ fontSize: '13px', fontWeight: 500, color: '#137333' }}>This rule is mapped and EXECUTABLE in the deviation engine.</span>
+            </div>
+          )}
         </div>
       )}
     </div>

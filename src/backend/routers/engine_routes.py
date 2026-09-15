@@ -50,7 +50,7 @@ router = APIRouter(tags=["Rule Engine Pipeline"])
     ),
 )
 def run_engine(
-    body: RunEngineRequest,
+    body: RunEngineRequest = RunEngineRequest(),
     db: Session = Depends(get_db),
 ) -> RunEngineResponse:
     """
@@ -71,6 +71,7 @@ def run_engine(
             num_sites=body.num_sites,
             patients_per_site=body.patients_per_site,
             random_seed=body.random_seed,
+            protocol_id=body.protocol_id,
         )
     except Exception as exc:
         logger.error(

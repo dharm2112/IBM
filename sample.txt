@@ -1,0 +1,4 @@
+The study visits include Screening, Baseline (Day 0), Month 2 (Day 60), Month 4 (Day 120), Month 6 (Day 180), and an End of Study visit at Month 12 (Day 365).
+The Month 2 visit should occur within +/- 7 days of Day 60.
+The Month 4 visit should occur within +/- 14 days of Day 120.
+All subjects must sign the Informed Consent Form before any study procedures.

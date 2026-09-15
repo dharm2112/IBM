@@ -8,6 +8,16 @@ import type {
 } from './types';
 import type { AuditLog } from './types';
 // ==========================================
+// ============================================================================
+// WARNING: MOCK DATA FIXTURES - NOT FOR PRODUCTION/DEMO USE
+// ============================================================================
+// This file contains hardcoded fallback data used ONLY for local UI
+// component testing and development when the backend is completely offline.
+// 
+// The primary application demo path uses: FastAPI -> client.ts -> SQLite.
+// Do NOT silently replace failed backend requests with these fakes.
+// ============================================================================
+
 // MOCK DATA FIXTURES
 // ==========================================
 

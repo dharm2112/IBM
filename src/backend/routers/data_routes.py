@@ -3,7 +3,8 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from src.backend.database import get_db
-from src.backend.db_models import EngineRun, SiteRecord, PatientRecord, VisitRecord, LabRecord, DoseRecord, MedicationRecord, SiteRiskScoreRecord, DetectedDeviationRecord, CapaRecord, ProtocolRuleRecord, AuditLogRecord, add_audit_event
+from src.backend.db_models import EngineRun, SiteRecord, PatientRecord, VisitRecord, LabRecord, DoseRecord, MedicationRecord, SiteRiskScoreRecord, DetectedDeviationRecord, CapaRecord, ProtocolRuleRecord, ProtocolRuleMappingRecord, AuditLogRecord, add_audit_event
+from src.ai.rule_mapper import get_canonical_rules
 
 router = APIRouter(tags=["Data APIs"])
 def latest(db): return db.query(EngineRun).order_by(EngineRun.started_at.desc()).first()
@@ -76,20 +77,64 @@ def capa_status(capa_id:str,body:dict,db:Session=Depends(get_db)):
     if not x:raise HTTPException(404,"CAPA not found")
     if new not in {"approved","rejected"}:raise HTTPException(422,"CAPA status must be approved or rejected")
     old=x.status;x.status=new;add_audit_event(db,f"capa_{new}","CAPA",capa_id,previous_status=old,new_status=new,source="user_review");db.commit();return capa_out(x)
-def rule_out(x):return {k:getattr(x,k) for k in ("rule_id","category","description","condition","expected_value","allowed_range","unit","visit","severity_hint","source_text","confidence","status")}
+def rule_out(x, m=None):
+    d = {k:getattr(x,k) for k in ("rule_id","protocol_id","category","description","condition","expected_value","allowed_range","unit","visit","severity_hint","source_text","confidence","status")}
+    if m:
+        d["mapping"] = {
+            "canonical_rule_id": m.canonical_rule_id,
+            "mapping_status": m.mapping_status,
+            "confidence": m.confidence,
+            "mapping_reason": m.mapping_reason
+        }
+    return d
 @router.get("/protocol/rules")
-def rules(db:Session=Depends(get_db)):return [rule_out(x) for x in db.query(ProtocolRuleRecord).order_by(ProtocolRuleRecord.created_at.desc())]
+def rules(db:Session=Depends(get_db)):
+    rules = db.query(ProtocolRuleRecord).order_by(ProtocolRuleRecord.created_at.desc()).all()
+    mappings = {m.extracted_rule_id: m for m in db.query(ProtocolRuleMappingRecord).all()}
+    return [rule_out(x, mappings.get(x.rule_id)) for x in rules]
 @router.get("/protocol/rules/{rule_id}")
 def rule(rule_id:str,db:Session=Depends(get_db)):
     x=db.query(ProtocolRuleRecord).filter_by(rule_id=rule_id).first()
     if not x:raise HTTPException(404,"Protocol rule not found")
-    return rule_out(x)
+    m = db.query(ProtocolRuleMappingRecord).filter_by(extracted_rule_id=rule_id).first()
+    return rule_out(x, m)
 @router.patch("/protocol/rules/{rule_id}/status")
 def rule_status(rule_id:str,body:dict,db:Session=Depends(get_db)):
     x=db.query(ProtocolRuleRecord).filter_by(rule_id=rule_id).first();new=body.get("status","").lower()
     if not x:raise HTTPException(404,"Protocol rule not found")
     if x.status!="pending" or new not in {"approved","rejected"}:raise HTTPException(422,"Only pending rules may be approved or rejected")
-    old=x.status;x.status=new;add_audit_event(db,f"protocol_rule_{new}","ProtocolRule",rule_id,previous_status=old,new_status=new,source="user_review");db.commit();return rule_out(x)
+    old=x.status;x.status=new;add_audit_event(db,f"protocol_rule_{new}","ProtocolRule",rule_id,previous_status=old,new_status=new,source="user_review");db.commit()
+    m = db.query(ProtocolRuleMappingRecord).filter_by(extracted_rule_id=rule_id).first()
+    return rule_out(x, m)
+    
+@router.get("/protocol/rules/{rule_id}/mapping")
+def get_rule_mapping(rule_id: str, db: Session = Depends(get_db)):
+    m = db.query(ProtocolRuleMappingRecord).filter_by(extracted_rule_id=rule_id).first()
+    if not m: raise HTTPException(404, "Mapping not found")
+    return {"canonical_rule_id": m.canonical_rule_id, "mapping_status": m.mapping_status, "mapping_reason": m.mapping_reason}
+
+@router.patch("/protocol/rules/{rule_id}/mapping")
+def update_rule_mapping(rule_id: str, body: dict, db: Session = Depends(get_db)):
+    m = db.query(ProtocolRuleMappingRecord).filter_by(extracted_rule_id=rule_id).first()
+    if not m: raise HTTPException(404, "Mapping not found")
+    new_status = body.get("status", "").lower()
+    if new_status not in {"approved", "rejected", "unsupported"}:
+        raise HTTPException(422, "Invalid status")
+    
+    old = m.mapping_status
+    m.mapping_status = new_status
+    
+    # Audit trail for mapping changes
+    add_audit_event(db, f"mapping_{new_status}", "ProtocolRuleMapping", rule_id, previous_status=old, new_status=new_status, source="user_review")
+    db.commit()
+    
+    x = db.query(ProtocolRuleRecord).filter_by(rule_id=rule_id).first()
+    return rule_out(x, m)
+
+@router.get("/protocol/canonical-rules")
+def get_canonical_rules_api():
+    return get_canonical_rules()
+
 @router.get("/audit-logs")
 def audits(db:Session=Depends(get_db)):
     return [{"audit_id":x.event_id,"timestamp":x.timestamp.isoformat(),"actor":x.source,"action":x.event_type,"entity_type":x.entity_type,"entity_id":x.entity_id,"details":x.details or "","previous_status":x.previous_status,"new_status":x.new_status,"source":x.source} for x in db.query(AuditLogRecord).order_by(AuditLogRecord.timestamp.desc())]

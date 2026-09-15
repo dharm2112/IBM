@@ -58,6 +58,8 @@ from src.backend.schemas import (
     GenerateCapaRequest,
     GenerateCapaResponse,
 )
+from src.ai.rule_mapper import get_canonical_rules, suggest_canonical_mapping
+from src.backend.db_models import ProtocolRuleMappingRecord
 
 logger = logging.getLogger(__name__)
 MAX_PROTOCOL_PDF_BYTES = 5 * 1024 * 1024
@@ -105,10 +107,23 @@ def extract_protocol(
     # (ProtocolExtractor already enforces this, but we assert it at the
     #  boundary for belt-and-braces safety.)
     rules_out = result.to_dict()["rules"]
+    protocol_id = f"PROTO-{uuid.uuid4().hex[:8].upper()}"
+    canonical_rules = get_canonical_rules()
+    
     for rule in rules_out:
         rule["status"] = "pending"
-        _persist_rule(db, rule)
-    add_audit_event(db, "protocol_extraction", "ProtocolRule", "batch", source="watsonx.ai", details=f"{len(rules_out)} rules extracted")
+        _persist_rule(db, rule, protocol_id)
+        
+        # Suggest canonical mapping
+        canonical_id, m_status, reason = suggest_canonical_mapping(rule, canonical_rules)
+        db.add(ProtocolRuleMappingRecord(
+            extracted_rule_id=rule["rule_id"],
+            canonical_rule_id=canonical_id,
+            mapping_status=m_status,
+            mapping_reason=reason
+        ))
+        
+    add_audit_event(db, "protocol_extraction", "ProtocolRule", "batch", source="watsonx.ai", details=f"{len(rules_out)} rules extracted for {protocol_id}")
     db.commit()
 
     logger.info(
@@ -119,6 +134,7 @@ def extract_protocol(
 
     return ExtractProtocolResponse(
         rule_count=result.rule_count,
+        protocol_id=protocol_id,
         rules=rules_out,
         warnings=result.warnings,
     )
@@ -199,10 +215,23 @@ def extract_protocol_pdf(
 
     # Defensive: ensure status="pending" on every rule regardless of AI output.
     rules_out = result.to_dict()["rules"]
+    protocol_id = f"PROTO-{uuid.uuid4().hex[:8].upper()}"
+    canonical_rules = get_canonical_rules()
+
     for rule in rules_out:
         rule["status"] = "pending"
-        _persist_rule(db, rule)
-    add_audit_event(db, "protocol_pdf_extraction", "ProtocolRule", "batch", source="watsonx.ai", details=f"{len(rules_out)} rules extracted")
+        _persist_rule(db, rule, protocol_id)
+        
+        # Suggest canonical mapping
+        canonical_id, m_status, reason = suggest_canonical_mapping(rule, canonical_rules)
+        db.add(ProtocolRuleMappingRecord(
+            extracted_rule_id=rule["rule_id"],
+            canonical_rule_id=canonical_id,
+            mapping_status=m_status,
+            mapping_reason=reason
+        ))
+        
+    add_audit_event(db, "protocol_pdf_extraction", "ProtocolRule", "batch", source="watsonx.ai", details=f"{len(rules_out)} rules extracted for {protocol_id}")
     db.commit()
 
     logger.info(
@@ -213,6 +242,7 @@ def extract_protocol_pdf(
 
     return ExtractProtocolResponse(
         rule_count=result.rule_count,
+        protocol_id=protocol_id,
         rules=rules_out,
         warnings=result.warnings,
     )
@@ -388,15 +418,16 @@ def generate_capa(
     )
 
 
-def _persist_rule(db: Session, rule: dict) -> None:
+def _persist_rule(db: Session, rule: dict, protocol_id: str) -> None:
     """Store AI-extracted review data only; never alter executable engine rules."""
     rule_id = rule["rule_id"]
     existing = db.query(ProtocolRuleRecord).filter_by(rule_id=rule_id).first()
     if existing:
         # Rule IDs can recur across extractions; preserve review history/status.
         return
-    db.add(ProtocolRuleRecord(rule_id=rule_id, category=rule.get("category"),
+    db.add(ProtocolRuleRecord(rule_id=rule_id, protocol_id=protocol_id, category=rule.get("category"),
         description=rule.get("description"), condition=rule.get("condition"),
         expected_value=rule.get("expected_value"), allowed_range=rule.get("allowed_range"),
         unit=rule.get("unit"), visit=rule.get("visit"), severity_hint=rule.get("severity_hint"),
         source_text=rule.get("source_text"), confidence=rule.get("confidence"), status="pending"))
+

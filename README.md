@@ -1,6 +1,4 @@
-# 🚀 [Your Project Title Here]
-
-> ⚠️ **Replace everything in `[ ]` brackets with your actual content before submission.**
+# 🚀 TrialGuard
 
 ---
 
@@ -8,36 +6,32 @@
 
 | Field | Value |
 |---|---|
-| **Team Name** | [Your Team Name] |
-| **Track** | [AI / DevOps / Sustainability / Open] |
-| **Team Lead** | [Name] — [email@ibm.com] |
-| **Members** | [Name 1], [Name 2], [Name 3] |
+| **Team Name** | Winterarc |
+| **Track** | AI |
+| **Team Lead** | Bhargav Rakholiya — 24dcs106@charusat.edu.in |
+| **Members** | Param Vadhadiya, gabani dharm, manav merja |
 
 ---
 
 ## 🎯 Problem Statement
 
-> In 2–3 sentences: What problem does your project solve? Who experiences this problem?
-
-[Describe the real-world problem your project addresses. Be specific about who the user is and what pain point they face.]
+Clinical research associates (CRAs) and study sponsors lack real-time, consolidated visibility into multi-site clinical trials. This fragmentation delays the detection of protocol deviations and adverse events, compromising patient safety, inflating trial costs, and risking regulatory audit failures.
 
 ---
 
 ## 💡 Solution
 
-> In 2–3 sentences: What did you build? How does it solve the problem above?
-
-[Describe your solution clearly. Explain the core mechanism — what makes it work.]
+We built Aegis Clinical, a centralized dashboard that tracks clinical trial data across all sites in real-time. It automatically flags protocol deviations and highlights high-risk sites, allowing research teams to respond instantly and keep the trial safe and compliant.
 
 ---
 
 ## ✨ Key Features
 
-- **Feature 1:** [Brief description — e.g., "Real-time anomaly detection using watsonx.ai"]
-- **Feature 2:** [Brief description]
-- **Feature 3:** [Brief description]
-- **Feature 4:** [Optional]
-- **Feature 5:** [Optional]
+- **Live Dashboard:** See all clinical sites and patients in one place.
+- **Issue Tracking:** Automatically catches and flags any rule violations.
+- **Site Risk Scores:** Highlights which sites need the most help using color codes.
+- **AI Document Reader:** Quickly extracts rules from long medical documents.
+- **Clean Design:** Very easy-to-use and professional interface.
 
 ---
 
@@ -45,11 +39,11 @@
 
 | Category | Technologies |
 |---|---|
-| **Languages** | [e.g., Python, TypeScript] |
-| **Frameworks** | [e.g., FastAPI, React] |
-| **IBM Technologies** | [e.g., watsonx.ai, IBM Bob, IBM Cloud] |
-| **Databases** | [e.g., PostgreSQL, Redis] |
-| **Other** | [e.g., Docker, GitHub Actions] |
+| **Languages** | Python, TypeScript |
+| **Frameworks** | FastAPI, React, Tailwind CSS |
+| **IBM Technologies** | watsonx.ai |
+| **Databases** | NeonDB |
+| **Other** | Framer Motion |
 
 ---
 
@@ -77,18 +71,24 @@
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/[your-repo].git
-cd [your-repo]
+git clone https://github.com/dharm2112/bob-ai-hackathon-Winterarc.git
+cd bob-ai-hackathon-Winterarc
 
-# 2. Install dependencies
-[your install command here]
+# 2. Install backend dependencies
+pip install -r src/requirements.txt
 
-# 3. Configure environment
-cp .env.example .env
-# Edit .env with your values
+# 3. Install frontend dependencies
+cd src/frontend && npm install && cd ../..
 
-# 4. Run the project
-[your run command here]
+# 4. Configure environment
+cp src/.env.example src/.env
+# Edit src/.env — fill in WATSONX_APIKEY, WATSONX_PROJECT_ID, WATSONX_URL, WATSONX_MODEL_ID
+
+# 5. Run the backend
+uvicorn src.backend.main:app --reload --port 8000
+
+# 6. Run the frontend (separate terminal)
+cd src/frontend && npm run dev
 ```
 
 ---
@@ -104,18 +104,14 @@ cp .env.example .env
 
 ---
 
-## ⚠️ Known Limitations
+## 🏅 What We're Most Proud Of
 
-> Be honest — judges appreciate transparency over overclaiming.
-
-- [Limitation 1: e.g., "Authentication is mocked — not production-ready"]
-- [Limitation 2: e.g., "Only tested on Chrome"]
-- [Limitation 3: e.g., "Feature X is scaffolded but not fully implemented"]
+We are most proud of how we seamlessly integrated AI-driven insights into a beautiful, high-performance 'Mission Control' interface. We successfully took complex, data-heavy clinical trial telemetry and distilled it into a clean, minimalist design that reduces cognitive load for researchers, proving that enterprise medical tools can be both powerful and intuitive.
 
 ---
 
-## 🏅 What We're Most Proud Of
+## ⚠️ Known Limitations
 
-[Tell the judges what part of your submission is strongest and worth paying close attention to.]
+Replace with any known limitations, incomplete features, or shortcuts taken due to time constraints.
 
 ---

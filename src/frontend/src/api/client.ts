@@ -49,6 +49,8 @@ function mapProtocolRule(x: any): ProtocolRule {
     threshold: '0',
     protocol_reference: 'AI Extraction',
     approval_status: statusMap[x.status?.toLowerCase()] ?? 'PENDING',
+    protocol_id: x.protocol_id,
+    mapping: x.mapping,
   };
 }
 
@@ -94,11 +96,15 @@ export const api = {
     return await fetchWithHandler('/health');
   },
 
-  async recalculateRisk() {
+  async recalculateRisk(protocol_id?: string) {
     // Run the engine pipeline
+    const payload: any = { num_sites: 5, patients_per_site: 5 };
+    if (protocol_id) {
+      payload.protocol_id = protocol_id;
+    }
     const response = await fetchWithHandler('/run-engine', {
       method: 'POST',
-      body: JSON.stringify({ num_sites: 5, patients_per_site: 5 }),
+      body: JSON.stringify(payload),
     });
 
     // We used to fetch sites and deviations here to sync mock cache, but it's no longer needed.
@@ -291,6 +297,13 @@ export const api = {
     return await fetchWithHandler(`/protocol/rules/${rule_id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status: 'rejected' }),
+    });
+  },
+
+  async updateRuleMapping(rule_id: string, status: 'approved' | 'rejected' | 'unsupported') {
+    return await fetchWithHandler(`/protocol/rules/${rule_id}/mapping`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
     });
   },
 

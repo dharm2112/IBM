@@ -112,6 +112,7 @@ def run_engine_pipeline(
     num_sites: int = 5,
     patients_per_site: int = 5,
     random_seed: int = 42,
+    protocol_id: Optional[str] = None,
 ) -> EngineRunResult:
     """
     Execute the full Member 1 pipeline and persist results.
@@ -139,17 +140,42 @@ def run_engine_pipeline(
     started_at = datetime.utcnow()
 
     logger.info(
-        "run_engine_pipeline start | run_id=%s | sites=%d | patients_per_site=%d",
+        "run_engine_pipeline start | run_id=%s | sites=%d | patients_per_site=%d | protocol_id=%s",
         run_id,
         num_sites,
         patients_per_site,
+        protocol_id,
     )
 
+    # ── Fetch Active Rules if protocol_id provided ─────────────────────────
+    active_rule_ids = None
+    if protocol_id:
+        from src.backend.db_models import ProtocolRuleRecord, ProtocolRuleMappingRecord
+        approved_mappings = (
+            db.query(ProtocolRuleMappingRecord.canonical_rule_id)
+            .join(ProtocolRuleRecord, ProtocolRuleRecord.rule_id == ProtocolRuleMappingRecord.extracted_rule_id)
+            .filter(ProtocolRuleRecord.protocol_id == protocol_id)
+            .filter(ProtocolRuleMappingRecord.mapping_status == "approved")
+            .filter(ProtocolRuleMappingRecord.canonical_rule_id != None)
+            .all()
+        )
+        active_rule_ids = [m[0] for m in approved_mappings]
+        if not active_rule_ids:
+            logger.info("No approved compatible mappings found for protocol_id=%s, falling back to default rules.", protocol_id)
+            active_rule_ids = None # Fallback to default
+        else:
+            logger.info(
+                "run_engine_pipeline | run_id=%s | using approved protocol_id=%s | active_rules=%d",
+                run_id, protocol_id, len(active_rule_ids)
+            )
+    
     # ── Create audit record ────────────────────────────────────────────────
     run_record = EngineRun(
         run_id=run_id,
         started_at=started_at,
         status="running",
+        protocol_id=protocol_id,
+        executable_rule_ids=json.dumps(active_rule_ids) if active_rule_ids is not None else None,
     )
     db.add(run_record)
     db.commit()
@@ -202,7 +228,7 @@ def run_engine_pipeline(
             end_date=m.end_date, dose=m.dose, indication=m.indication) for m in bundle.medications])
 
         # ── Step 2: Rule engine evaluation ────────────────────────────────
-        engine = TrialGuardRuleEngine()
+        engine = TrialGuardRuleEngine(active_rule_ids=active_rule_ids)
         deviations: List[DetectedDeviation] = engine.evaluate(bundle)
 
         logger.info(

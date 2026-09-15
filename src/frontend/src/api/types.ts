@@ -66,6 +66,13 @@ export interface ProtocolRule {
   severity?: Severity;
   protocol_reference?: string;
   approval_status: ApprovalStatus;
+  protocol_id?: string;
+  mapping?: {
+    canonical_rule_id: string | null;
+    mapping_status: string;
+    confidence: string;
+    mapping_reason: string;
+  };
 }
 
 export type CapaStatus = 'Draft' | 'Pending Review' | 'Approved' | 'Rejected' | 'Closed';

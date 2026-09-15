@@ -183,12 +183,25 @@ export const ExecutiveDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [selectedDeviation, setSelectedDeviation] = useState<Deviation | null>(null);
+  const [protocolOptions, setProtocolOptions] = useState<{id: string, name: string}[]>([{id: '', name: 'Default Demo Protocol'}]);
+  const [selectedProtocol, setSelectedProtocol] = useState<string>('');
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [s, d, p] = await Promise.all([api.getSites(), api.getDeviations(), api.getPatients()]);
+      const [s, d, p, rules] = await Promise.all([api.getSites(), api.getDeviations(), api.getPatients(), api.getProtocolRules()]);
       setSites(s); setDeviations(d); setPatientCount(p.length);
+      
+      const uniqueProtocols = Array.from(new Set(rules.map((r: any) => r.protocol_id).filter(Boolean)));
+      if (uniqueProtocols.length > 0) {
+        setProtocolOptions([
+          {id: '', name: 'Default Demo Protocol'},
+          ...uniqueProtocols.map(pid => ({id: pid as string, name: `Uploaded Protocol: ${pid}`}))
+        ]);
+        if (!selectedProtocol && uniqueProtocols.length > 0) {
+            setSelectedProtocol(uniqueProtocols[0] as string);
+        }
+      }
     } catch (e) { console.error(e); }
     finally { setIsLoading(false); }
   };
@@ -197,7 +210,7 @@ export const ExecutiveDashboard = () => {
 
   const handleRecalculate = async () => {
     setIsRecalculating(true);
-    try { await api.recalculateRisk(); await fetchData(); }
+    try { await api.recalculateRisk(selectedProtocol || undefined); await fetchData(); }
     finally { setIsRecalculating(false); }
   };
 
@@ -248,6 +261,15 @@ export const ExecutiveDashboard = () => {
             <RefreshCw size={14} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
             Refresh
           </button>
+          
+          <select 
+            value={selectedProtocol} 
+            onChange={e => setSelectedProtocol(e.target.value)}
+            style={{ padding: '0 12px', height: 36, borderRadius: 10, border: `1px solid ${T.border}`, background: T.surface, color: T.text, fontSize: '13px', outline: 'none' }}
+          >
+            {protocolOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+
           <RecalculateRiskButton 
             isRecalculating={isRecalculating} 
             onClick={handleRecalculate} 
@@ -256,6 +278,26 @@ export const ExecutiveDashboard = () => {
       </motion.div>
 
       {/* ── Alert banner ── */}
+      <AnimatePresence>
+        {selectedProtocol && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.3, ease }}
+            style={{ background: '#E6F4FF', border: '1px solid rgba(24,144,255,0.2)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#1890FF', fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>
+              <AlertTriangle size={16} strokeWidth={2} /> INFO
+            </div>
+            <p style={{ margin: 0, fontSize: '13px', color: T.text }}>
+              Prototype execution uses the validated default deterministic rule set for AI-extracted rules.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── High Risk banner ── */}
       <AnimatePresence>
         {highRisk > 0 && (
           <motion.div

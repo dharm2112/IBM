@@ -66,6 +66,10 @@ class EngineRun(Base):
 
     error_message = Column(Text, nullable=True)
 
+    protocol_id = Column(String(128), nullable=True)
+    protocol_version = Column(String(64), nullable=True)
+    executable_rule_ids = Column(Text, nullable=True) # JSON list of executed rule IDs
+
     def to_dict(self) -> dict:
         return {
             "run_id": self.run_id,
@@ -78,6 +82,9 @@ class EngineRun(Base):
             "sites_scored": self.sites_scored,
             "high_risk_sites": self.high_risk_sites,
             "error_message": self.error_message,
+            "protocol_id": self.protocol_id,
+            "protocol_version": self.protocol_version,
+            "executable_rule_ids": json.loads(self.executable_rule_ids or "[]"),
         }
 
 
@@ -248,8 +255,20 @@ class CapaRecord(Base):
 class ProtocolRuleRecord(Base):
     __tablename__ = "protocol_rules_review"
     id = Column(Integer, primary_key=True); rule_id = Column(String(128), unique=True, nullable=False, index=True)
+    protocol_id = Column(String(128), index=True)
     category = Column(String(64)); description = Column(Text); condition = Column(Text); expected_value = Column(Text); allowed_range = Column(Text); unit = Column(String(64)); visit = Column(String(64)); severity_hint = Column(String(64)); source_text = Column(Text); confidence = Column(String(32))
     status = Column(String(32), nullable=False, default="pending"); created_at = Column(DateTime, default=datetime.utcnow); updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ProtocolRuleMappingRecord(Base):
+    __tablename__ = "protocol_rule_mappings"
+    id = Column(Integer, primary_key=True)
+    extracted_rule_id = Column(String(128), ForeignKey("protocol_rules_review.rule_id"), nullable=False, index=True)
+    canonical_rule_id = Column(String(128), nullable=True)
+    mapping_status = Column(String(32), nullable=False, default="pending") # pending, approved, rejected, unsupported
+    confidence = Column(String(32), default="medium")
+    mapping_reason = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class AuditLogRecord(Base):
