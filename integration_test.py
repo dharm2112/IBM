@@ -57,7 +57,7 @@ def test():
         assert "explanation" in explain_data
         print("POST /ai/explain-risk : OK")
         print("Explanation snippet:", explain_data["explanation"][:100], "...")
-        assert explain_data.get("risk_score") is None, "AI recalculating risk!"
+        assert explain_data.get("risk_score") == site["risk_score"], "AI recalculating risk!"
     except requests.exceptions.HTTPError as e:
         print(f"Error calling /ai/explain-risk: {e.response.text}")
         if "Missing required environment" in e.response.text:

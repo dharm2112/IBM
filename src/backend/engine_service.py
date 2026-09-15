@@ -157,15 +157,10 @@ def run_engine_pipeline(
             patients_per_site=patients_per_site,
             random_seed=random_seed,
         )
-        # If generating less than the full trial (10 sites x 10 patients),
-        # bypass the hardcoded scenarios file and use programmatic injection.
-        # Otherwise the hardcoded scenario indices cause 'NoneType' errors.
-        scenarios_path = None
-        if num_sites < 10 or patients_per_site < 10:
-            import pathlib
-            scenarios_path = pathlib.Path("/dev/null/does_not_exist.json")
-
-        bundle: DatasetBundle = generate_dataset(config, scenarios_path=scenarios_path)
+        # Pass scenarios_path=None so generate_dataset searches for the default
+        # deviation_scenarios.json. If it is not found the injector is skipped
+        # automatically — no fake path needed (and /dev/null doesn't exist on Windows).
+        bundle: DatasetBundle = generate_dataset(config, scenarios_path=None)
 
         logger.info(
             "run_engine_pipeline | run_id=%s | dataset generated | summary=%s",

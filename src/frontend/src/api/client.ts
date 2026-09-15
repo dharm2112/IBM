@@ -62,12 +62,13 @@ export const api = {
       risk_level: s.risk_level.toUpperCase(),
     }));
 
-    // Map backend deviation samples to frontend Deviation types
-    const newDeviations: Deviation[] = response.deviation_sample.map((d: any) => ({
+    // Fetch ALL deviations from the DB (not the 10-item truncated sample in the run response)
+    const allDeviationsRaw = await fetchWithHandler('/deviations');
+    const newDeviations: Deviation[] = allDeviationsRaw.map((d: any) => ({
       deviation_id: d.deviation_id,
       site_id: d.site_id,
       patient_id: d.patient_id,
-      visit_id: 'V-GEN',
+      visit_id: d.visit_id || 'V-GEN',
       rule_id: d.rule_id,
       category: d.category,
       description: d.description,
@@ -75,7 +76,7 @@ export const api = {
       actual: d.actual || 'N/A',
       severity: d.severity.toUpperCase(),
       status: d.status || 'Open',
-      detected_at: new Date().toISOString(),
+      detected_at: d.detected_at || new Date().toISOString(),
     }));
 
     // Update the mock data in memory so the rest of the app sees the new generated data
